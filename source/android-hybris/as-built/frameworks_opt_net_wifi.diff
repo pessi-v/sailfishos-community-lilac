@@ -1,0 +1,19 @@
+diff --git a/service/java/com/android/server/wifi/util/Environment.java b/service/java/com/android/server/wifi/util/Environment.java
+index a423d55e6..5447cfb7d 100644
+--- a/service/java/com/android/server/wifi/util/Environment.java
++++ b/service/java/com/android/server/wifi/util/Environment.java
+@@ -60,6 +60,13 @@ public class Environment {
+      * Checks if the app's path starts with "/apex/com.android.wifi".
+      */
+     public static boolean isAppInWifiApex(ApplicationInfo appInfo) {
+-        return appInfo.sourceDir.startsWith(WIFI_APEX_PATH);
++        // lilac: no real apexd here -- this device can never have a
++        // genuine-APEX package to confuse with an impostor competing for the same intent
++        // filter -- ApexManagerFlattenedApex never scans /apex/*/priv-app/ here, so nothing
++        // installed ever has a real /apex/... sourceDir, and this check would otherwise
++        // reject ServiceWifiResources.apk unconditionally and fatally crash-loop
++        // system_server every ~15s in WifiService's constructor.
++        // was: return appInfo.sourceDir.startsWith(WIFI_APEX_PATH);
++        return true;
+     }
+ }

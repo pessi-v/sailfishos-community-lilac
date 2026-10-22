@@ -1,0 +1,10 @@
+# this kernel's USB power_supply node reports
+# POWER_SUPPLY_TYPE=USB_PD (Type-C Power Delivery), a value mce's battery-udev
+# module (modules/battery-udev.c) doesn't recognize -- confirmed live via its own
+# "unknown charger type: USB_PD" log line, logged repeatedly on every re-poll.
+# Effect: mce correctly detects *that* something changed but doesn't correctly
+# resolve the online/offline transition for this specific, unrecognized type, so
+# the battery indicator's charging icon/cable glyph doesn't update when the USB
+# cable is actually removed. Remap the type to plain "USB", which mce does
+# recognize, before it ever reaches mce's udev monitor.
+SUBSYSTEM=="power_supply", KERNEL=="usb", ATTR{type}=="USB_PD", ENV{POWER_SUPPLY_TYPE}="USB"

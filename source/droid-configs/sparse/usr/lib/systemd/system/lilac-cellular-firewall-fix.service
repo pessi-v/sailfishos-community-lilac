@@ -1,0 +1,15 @@
+[Unit]
+Description=Allow inbound traffic on the cellular data interfaces real netd never allowlists
+DefaultDependencies=no
+After=droid-hal-init.service
+Conflicts=shutdown.target
+
+[Service]
+Type=simple
+ExecStart=/bin/sh /usr/local/bin/lilac-cellular-firewall-fix.sh
+Restart=always
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

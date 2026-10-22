@@ -1,0 +1,88 @@
+diff --git a/cmds/servicemanager/Access.cpp b/cmds/servicemanager/Access.cpp
+index b7e520f2f1..f3889b6dbd 100644
+--- a/cmds/servicemanager/Access.cpp
++++ b/cmds/servicemanager/Access.cpp
+@@ -21,6 +21,7 @@
+ #include <log/log_safetynet.h>
+ #include <selinux/android.h>
+ #include <selinux/avc.h>
++#include <selinux/selinux.h>
+ 
+ namespace android {
+ 
+@@ -30,6 +31,13 @@ constexpr bool kIsVendor = true;
+ constexpr bool kIsVendor = false;
+ #endif
+ 
++// hybris: this system boots with no SELinux policy loaded. Probe once and
++// degrade to permissive rather than aborting. See patch header.
++static bool seUsable() {
++    static const bool kUsable = (is_selinux_enabled() == 1);
++    return kUsable;
++}
++
+ static std::string getPidcon(pid_t pid) {
+     android_errorWriteLog(0x534e4554, "121035042");
+ 
+@@ -88,6 +96,11 @@ Access::Access() {
+     cb.func_log = kIsVendor ? selinux_vendor_log_callback : selinux_log_callback;
+     selinux_set_callback(SELINUX_CB_LOG, cb);
+ 
++    if (!seUsable()) {
++        LOG(WARNING) << "SELinux not enabled; servicemanager access control disabled";
++        return;
++    }
++
+     CHECK(selinux_status_open(true /*fallback*/) >= 0);
+ 
+     CHECK(getcon(&mThisProcessContext) == 0);
+@@ -124,6 +137,8 @@ bool Access::canList(const CallingContext& ctx) {
+ 
+ bool Access::actionAllowed(const CallingContext& sctx, const char* tctx, const char* perm,
+         const std::string& tname) {
++    if (!seUsable()) return true;
++
+     const char* tclass = "service_manager";
+ 
+     AuditCallbackData data = {
+@@ -136,6 +151,8 @@ bool Access::actionAllowed(const CallingContext& sctx, const char* tctx, const c
+ }
+ 
+ bool Access::actionAllowedFromLookup(const CallingContext& sctx, const std::string& name, const char *perm) {
++    if (!seUsable()) return true;
++
+     char *tctx = nullptr;
+     if (selabel_lookup(getSehandle(), &tctx, name.c_str(), SELABEL_CTX_ANDROID_SERVICE) != 0) {
+         LOG(ERROR) << "SELinux: No match for " << name << " in service_contexts.\n";
+diff --git a/headers/media_plugin/media/hardware/HardwareAPI.h b/headers/media_plugin/media/hardware/HardwareAPI.h
+index ae0220a5eb..05e9559a5a 100644
+--- a/headers/media_plugin/media/hardware/HardwareAPI.h
++++ b/headers/media_plugin/media/hardware/HardwareAPI.h
+@@ -150,6 +150,12 @@ struct VideoNativeMetadata {
+     int nFenceFd;                           // -1 if unused
+ };
+ 
++struct VideoNativeMetadata_ptrSized {
++    MetadataBufferType eType;               // must be kMetadataBufferTypeANWBuffer
++    struct ANativeWindowBuffer* pBuffer;
++    int nFenceFd;                           // -1 if unused
++};
++
+ // Meta data buffer layout for passing a native_handle to codec
+ struct VideoNativeHandleMetadata {
+     MetadataBufferType eType;               // must be kMetadataBufferTypeNativeHandleSource
+@@ -161,6 +167,14 @@ struct VideoNativeHandleMetadata {
+ #endif
+ };
+ 
++// Meta data buffer layout for passing a native_handle to codec
++// mer-hybris: 64-bit version used in conversion code for 32-bit OMX
++struct VideoNativeHandleMetadata_ptrSized {
++    MetadataBufferType eType;               // must be kMetadataBufferTypeNativeHandleSource
++
++    native_handle_t *pHandle;
++};
++
+ // A pointer to this struct is passed to OMX_SetParameter() when the extension
+ // index "OMX.google.android.index.prepareForAdaptivePlayback" is given.
+ //

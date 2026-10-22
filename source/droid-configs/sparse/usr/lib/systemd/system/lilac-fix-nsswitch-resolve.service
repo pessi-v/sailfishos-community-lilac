@@ -1,0 +1,16 @@
+[Unit]
+Description=Switch nsswitch.conf hosts resolution to use systemd-resolved
+DefaultDependencies=no
+Before=network.target multi-user.target
+After=local-fs.target
+Conflicts=shutdown.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/sh /usr/bin/droid/lilac-fix-nsswitch-resolve.sh
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

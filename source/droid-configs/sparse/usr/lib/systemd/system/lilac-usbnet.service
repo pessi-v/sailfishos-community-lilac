@@ -1,0 +1,24 @@
+[Unit]
+Description=USB CDC-ECM debug network, bypassing usb-moded
+# Same shape as lilac-boot-qcrild.service, which is proven to run on this port:
+# DefaultDependencies=no and After=sysinit.target. Deliberately does NOT want
+# systemd-udev-settle -- that dependency is precisely why usb-moded never starts
+# here (10.101).
+DefaultDependencies=no
+After=sysinit.target
+Conflicts=shutdown.target
+
+[Service]
+# Type=simple, NOT oneshot: the script holds the link up for 5 minutes, and a
+# oneshot wanted by sysinit.target would block the entire boot behind it for that
+# whole time. simple is considered started immediately and runs on in the
+# background, which is what a watchdog like this wants.
+Type=simple
+ExecStart=/bin/sh /usr/local/bin/lilac-usbnet.sh
+# Never block the boot on this: the script exits 0 on every failure path and
+# writes its diagnosis to /data/usbnet.log instead.
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=sysinit.target

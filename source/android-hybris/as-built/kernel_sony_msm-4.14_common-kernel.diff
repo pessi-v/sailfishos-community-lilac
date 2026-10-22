@@ -1,0 +1,559 @@
+diff --git a/arch/arm64/boot/dts/qcom/msm8998-vidc.dtsi b/arch/arm64/boot/dts/qcom/msm8998-vidc.dtsi
+index b8d6134a96bb..3f7f08393bed 100644
+--- a/arch/arm64/boot/dts/qcom/msm8998-vidc.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8998-vidc.dtsi
+@@ -72,7 +72,11 @@
+ 			<465000000 8490000>; /* imem @ turbo freq 406 Mhz */
+ 
+ 		/* Regulators */
+-		smmu-vdd-supply = <&gdsc_bimc_smmu>;
++		/* lilac: no smmu-vdd-supply. gdsc_bimc_smmu is status="disabled" here as it
++		 * is on 4.4, and naming an unregistered provider makes this kernel return
++		 * -EPROBE_DEFER where 4.4 fell back to a dummy. Omitting it gives -ENODEV
++		 * -> dummy, i.e. exactly the rail Venus has always had on 4.4.
++		 * */
+ 		venus-supply = <&gdsc_venus>;
+ 		venus-core0-supply = <&gdsc_venus_core0>;
+ 		venus-core1-supply = <&gdsc_venus_core1>;
+diff --git a/arch/arm64/boot/dts/qcom/msm8998-yoshino-common.dtsi b/arch/arm64/boot/dts/qcom/msm8998-yoshino-common.dtsi
+index 09daa7b5814f..2e8c3e67564a 100644
+--- a/arch/arm64/boot/dts/qcom/msm8998-yoshino-common.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8998-yoshino-common.dtsi
+@@ -28,15 +28,20 @@
+ 	};
+ 
+ 	reserved-memory {
++		/* lilac: LineageOS-compatible ramoops geometry, so a failed boot's console
++		 * log can be read back from LineageOS at /sys/fs/pstore/ afterward.
++		 * This kernel's own sizes were record 0x10000 / console 0x60000 /
++		 * ftrace 0x10000 / pmsg 0x20000 / ecc 16.
++		 */
+ 		ramoops@ffc00000 {
+ 			compatible = "removed-dma-pool", "ramoops";
+ 			no-map;
+ 			reg = <0 0xffc00000 0 0x00100000>;
+-			record-size = <0x10000>;
+-			console-size = <0x60000>;
+-			ftrace-size = <0x10000>;
+-			pmsg-size = <0x20000>;
+-			ecc-size = <16>;
++			record-size = <0x1000>;
++			console-size = <0x40000>;
++			ftrace-size = <0x0>;
++			pmsg-size = <0x0>;
++			ecc-size = <0x0>;
+ 		};
+ 	};
+ 
+diff --git a/arch/arm64/boot/dts/qcom/msm8998.dtsi b/arch/arm64/boot/dts/qcom/msm8998.dtsi
+index a4825bc5543f..3bd932eeb8d2 100644
+--- a/arch/arm64/boot/dts/qcom/msm8998.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8998.dtsi
+@@ -638,7 +638,7 @@
+ 		interrupt-controller;
+ 		#interrupt-cells = <4>;
+ 		cell-index = <0>;
+-		qcom,enable-ahb-bus-workaround;
++		/* lilac: AHB workaround removed -- reads cnfg+0x6000 outside the 0x3000 cnfg mapping and panics at qpnp_pon probe */
+ 	};
+ 
+ 	qcom,sps {
+diff --git a/arch/arm64/configs/aosp_yoshino_lilac_defconfig b/arch/arm64/configs/aosp_yoshino_lilac_defconfig
+index 95e808cf82b5..bf995c88d98c 100644
+--- a/arch/arm64/configs/aosp_yoshino_lilac_defconfig
++++ b/arch/arm64/configs/aosp_yoshino_lilac_defconfig
+@@ -1,4 +1,3 @@
+-# CONFIG_FHANDLE is not set
+ CONFIG_AUDIT=y
+ CONFIG_NO_HZ=y
+ CONFIG_HIGH_RES_TIMERS=y
+@@ -22,8 +21,6 @@ CONFIG_CGROUP_FREEZER=y
+ CONFIG_CGROUP_CPUACCT=y
+ CONFIG_CGROUP_BPF=y
+ CONFIG_NAMESPACES=y
+-# CONFIG_UTS_NS is not set
+-# CONFIG_PID_NS is not set
+ CONFIG_SCHED_TUNE=y
+ CONFIG_DEFAULT_USE_ENERGY_AWARE=y
+ CONFIG_BLK_DEV_INITRD=y
+@@ -42,7 +39,7 @@ CONFIG_EMBEDDED=y
+ CONFIG_PROFILING=y
+ CONFIG_KPROBES=y
+ CONFIG_JUMP_LABEL=y
+-CONFIG_CC_STACKPROTECTOR_REGULAR=y
++CONFIG_CC_STACKPROTECTOR_NONE=y
+ CONFIG_ARCH_MMAP_RND_COMPAT_BITS=16
+ # CONFIG_VMAP_STACK is not set
+ CONFIG_REFCOUNT_FULL=y
+@@ -84,7 +81,8 @@ CONFIG_ARM64_SW_TTBR0_PAN=y
+ CONFIG_BUILD_ARM64_APPENDED_DTB_IMAGE=y
+ # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
+ CONFIG_COMPAT=y
+-CONFIG_COMPAT_VDSO=y
++# CONFIG_COMPAT_VDSO is not set
++CONFIG_ARM_ARCH_TIMER_VCT_ACCESS=y
+ CONFIG_PM_WAKELOCKS=y
+ CONFIG_PM_WAKELOCKS_LIMIT=0
+ # CONFIG_PM_WAKELOCKS_GC is not set
+@@ -298,7 +296,6 @@ CONFIG_DM_VERITY_FEC=y
+ CONFIG_DM_ANDROID_VERITY=y
+ CONFIG_DM_BOW=y
+ CONFIG_NETDEVICES=y
+-CONFIG_DUMMY=y
+ CONFIG_MACVLAN=y
+ CONFIG_MACVTAP=y
+ CONFIG_IPVLAN=y
+@@ -420,7 +417,7 @@ CONFIG_INPUT_GPIO=y
+ CONFIG_INPUT_BU520X1NVX=y
+ CONFIG_FPC1145_PLATFORM=y
+ CONFIG_SERIO_LIBPS2=y
+-# CONFIG_VT is not set
++CONFIG_VT=y
+ # CONFIG_LEGACY_PTYS is not set
+ # CONFIG_DEVMEM is not set
+ CONFIG_SERIAL_MSM=y
+@@ -517,6 +514,12 @@ CONFIG_MSMB_JPEG=y
+ CONFIG_MSM_FD=y
+ CONFIG_MSM_JPEGDMA=y
+ CONFIG_SONY_CAM_V4L2=y
++# lilac 10.180: the AMS tcs3490 RGBC-IR sensor. excalibur's camera
++# HAL reads /sys/devices/virtual/input/rgbcir_sensor/chip_pow during
++# init and aborts (num 0 cameras) if it is absent. Driver source and
++# the tcs3490@72 DT node are already in the tree; only this switch was
++# dropped from the 4.14 defconfig (present in Sony's 4.4 config).
++CONFIG_SENSORS_TCS3490=y
+ CONFIG_MSM_VIDC_3X_V4L2=y
+ CONFIG_MSM_VIDC_3X_VMEM=y
+ CONFIG_MSM_VIDC_3X_GOVERNORS=y
+@@ -623,6 +626,15 @@ CONFIG_ANDROID_LOW_MEMORY_KILLER=y
+ CONFIG_ANDROID_LOW_MEMORY_KILLER_TNG=y
+ CONFIG_ANDROID_LOW_MEMORY_KILLER_STATS=y
+ CONFIG_ION=y
++# lilac 10.142: 4.14 split the ION heaps into their own configs and this
++# defconfig kept only CONFIG_ION. Without a heap type compiled in,
++# msm_ion_of parses the DT heaps and can create none, so ION_IOC_ALLOC
++# fails EINVAL and gralloc returns NULL buffer handles. 4.4 got these via
++# CONFIG_ION_MSM=y, which no longer exists.
++CONFIG_ION_SYSTEM_HEAP=y
++CONFIG_ION_CARVEOUT_HEAP=y
++CONFIG_ION_CHUNK_HEAP=y
++CONFIG_ION_CMA_HEAP=y
+ CONFIG_QCA_CLD_WLAN=y
+ CONFIG_QCACLD_WLAN_LFR3=y
+ CONFIG_WLAN_FEATURE_11W=y
+@@ -666,9 +678,9 @@ CONFIG_QCOM_APCS_IPC=y
+ CONFIG_IOMMU_IO_PGTABLE_FAST=y
+ CONFIG_ARM_SMMU=y
+ CONFIG_QCOM_LAZY_MAPPING=y
+-CONFIG_IOMMU_DEBUG=y
+-CONFIG_IOMMU_DEBUG_TRACKING=y
+-CONFIG_IOMMU_TESTS=y
++# CONFIG_IOMMU_DEBUG is not set
++# CONFIG_IOMMU_DEBUG_TRACKING is not set
++# CONFIG_IOMMU_TESTS is not set
+ CONFIG_REMOTEPROC=y
+ CONFIG_RPMSG_CHAR=y
+ CONFIG_RPMSG_QCOM_GLINK_RPM=y
+@@ -887,3 +899,36 @@ CONFIG_SND_SOC_MSM_SDW=y
+ CONFIG_SND_SOC_MSM_HDMI_CODEC_RX=y
+ CONFIG_SND_SOC_WCD_CPE_SOMC_EXT=y
+ CONFIG_SND_SOC_MSM8998=y
++
++# --- Sailfish OS / hybris requirements,md sec.5 ---
++# hybris-boot check_kernel_config
++CONFIG_SYSVIPC=y
++CONFIG_DEVTMPFS=y
++CONFIG_DEVTMPFS_MOUNT=y
++CONFIG_AUTOFS4_FS=y
++# CONFIG_DUMMY is not set
++# NB: CONFIG_VT stays off -- the init-script drops it from the mandatory list.
++
++# systemd
++CONFIG_FHANDLE=y
++CONFIG_UTS_NS=y
++CONFIG_IPC_NS=y
++CONFIG_BLK_CGROUP=y
++
++# sailjail/firejail: without these clone() returns EINVAL and nothing sandboxed starts
++CONFIG_PID_NS=y
++CONFIG_USER_NS=y
++
++# bluebinder needs /dev/vhci
++CONFIG_BT_HCIVHCI=y
++
++# USB networking to the host
++CONFIG_USB_CONFIGFS_ECM=y
++CONFIG_INPUT_STMVL53L0=y
++CONFIG_PM_AUTOSLEEP=y
++CONFIG_BT_RFCOMM=y
++CONFIG_BT_RFCOMM_TTY=y
++CONFIG_BT_BNEP=y
++CONFIG_BT_BNEP_MC_FILTER=y
++CONFIG_BT_BNEP_PROTO_FILTER=y
++CONFIG_BT_HIDP=y
+diff --git a/arch/arm64/kernel/vdso/Makefile b/arch/arm64/kernel/vdso/Makefile
+index 89df44e87ab0..94c6427624be 100644
+--- a/arch/arm64/kernel/vdso/Makefile
++++ b/arch/arm64/kernel/vdso/Makefile
+@@ -16,13 +16,14 @@ obj-vdso-c := $(addprefix $(obj)/, $(obj-vdso-c))
+ obj-vdso   := $(obj-vdso-c) $(obj-vdso-s)
+ 
+ ccflags-y := -shared -fno-common -fno-builtin -fno-stack-protector -ffixed-x18
++ccflags-y += -B$(HOME)/lilac-v2/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9/bin
+ ccflags-y += -DDISABLE_BRANCH_PROFILING
+ ccflags-y += -nostdlib -Wl,-soname=linux-vdso.so.1 -Wl,--hash-style=sysv
+ ccflags-y += $(DISABLE_LTO) $(DISABLE_SCS)
+ 
+ # Force -O2 to avoid libgcc dependencies
+ CFLAGS_REMOVE_vgettimeofday.o = -pg -Os
+-CFLAGS_vgettimeofday.o = -O2 -fPIC
++CFLAGS_vgettimeofday.o = -O2 -fPIC -fintegrated-as
+ ifneq ($(cc-name),clang)
+ CFLAGS_vgettimeofday.o += -mcmodel=tiny
+ endif
+diff --git a/drivers/clk/qcom/gcc-msm8998.c b/drivers/clk/qcom/gcc-msm8998.c
+index 9a4bf3c18d8f..db8281820930 100644
+--- a/drivers/clk/qcom/gcc-msm8998.c
++++ b/drivers/clk/qcom/gcc-msm8998.c
+@@ -2676,7 +2676,7 @@ static struct clk_branch gcc_usb_phy_cfg_ahb2phy_clk = {
+ 
+ static struct clk_branch gcc_mss_cfg_ahb_clk = {
+ 	.halt_reg = 0x8A000,
+-	.halt_check = BRANCH_HALT,
++	.halt_check = BRANCH_HALT_SKIP, /* lilac-v2: skip halt poll -- modem off during PIL MBA load */
+ 	.hwcg_reg = 0x8a000,
+ 	.hwcg_bit = 1,
+ 	.clkr = {
+@@ -2691,6 +2691,7 @@ static struct clk_branch gcc_mss_cfg_ahb_clk = {
+ 
+ static struct clk_branch gcc_mss_q6_bimc_axi_clk = {
+ 	.halt_reg = 0x8A040,
++	.halt_check = BRANCH_HALT_SKIP, /* lilac: skip halt poll -- modem off at GCC probe, was aborting the whole controller */
+ 	.clkr = {
+ 		.enable_reg = 0x8A040,
+ 		.enable_mask = BIT(0),
+diff --git a/drivers/gpu/drm/drm_atomic.c b/drivers/gpu/drm/drm_atomic.c
+index a87ead3c5c20..4c0f58f83f60 100644
+--- a/drivers/gpu/drm/drm_atomic.c
++++ b/drivers/gpu/drm/drm_atomic.c
+@@ -764,6 +764,20 @@ static int drm_atomic_plane_set_property(struct drm_plane *plane,
+ 	} else if (property == config->prop_src_h) {
+ 		state->src_h = val;
+ 	} else if (property == plane->rotation_property) {
++		/*
++		 * lilac 10.148: msm8998's Android 9 SDM sends rotation=0 to
++		 * mean "no rotation". The ABI spells that DRM_MODE_ROTATE_0
++		 * (== 1) and wants exactly one rotate bit, so is_power_of_2(0)
++		 * refuses it and the whole atomic commit fails EINVAL -- which
++		 * is why the display was never programmed at all.
++		 *
++		 * 4.4, which these blobs were built against, had no check here
++		 * and simply stored the value, so the distinction was never
++		 * forced on them. Read "no bits" as ROTATE_0, which is what the
++		 * caller means; ambiguous multi-bit values are still refused.
++		 */
++		if (!(val & DRM_MODE_ROTATE_MASK))
++			val |= DRM_MODE_ROTATE_0;
+ 		if (!is_power_of_2(val & DRM_MODE_ROTATE_MASK))
+ 			return -EINVAL;
+ 		state->rotation = val;
+@@ -2321,6 +2335,18 @@ int drm_mode_atomic_ioctl(struct drm_device *dev,
+ 			ret = drm_atomic_set_property(state, obj, prop,
+ 						      prop_value);
+ 			if (ret) {
++				/*
++				 * lilac-v2 41: this is the only EINVAL in this
++				 * loop and the kernel otherwise says nothing,
++				 * which is why the DRM connector never going
++				 * active has been opaque.
++				 * Ratelimited: userspace retries
++				 * the commit repeatedly.
++				 */
++				DRM_ERROR_RATELIMITED(
++					"lilac-v2: atomic set_property failed: obj %u type 0x%x prop %u \"%s\" value 0x%llx -> %d\n",
++					obj->id, obj->type, prop->base.id,
++					prop->name, prop_value, ret);
+ 				drm_mode_object_put(obj);
+ 				goto out;
+ 			}
+diff --git a/drivers/media/platform/msm/camera_v2/sensor/flash/msm_flash.c b/drivers/media/platform/msm/camera_v2/sensor/flash/msm_flash.c
+index 703df3e6ed1d..16dae115c378 100644
+--- a/drivers/media/platform/msm/camera_v2/sensor/flash/msm_flash.c
++++ b/drivers/media/platform/msm/camera_v2/sensor/flash/msm_flash.c
+@@ -747,6 +747,18 @@ static int32_t msm_flash_prepare(
+ 	return ret;
+ }
+ 
++/* lilac: the flash LED is wired across both strings and faults if only one carries
++ * current; the generic HAL fills flash_current[0] only (the other slots are 0 or garbage).
++ * Use string 0's request for every string. */
++static void msm_flash_mirror_first_string(int32_t *flash_current,
++	uint32_t num_sources)
++{
++	uint32_t i;
++
++	for (i = 1; i < num_sources && i < MAX_LED_TRIGGERS; i++)
++		flash_current[i] = flash_current[0];
++}
++
+ static int32_t msm_flash_low(
+ 	struct msm_flash_ctrl_t *flash_ctrl,
+ 	struct msm_flash_cfg_data_t *flash_data)
+@@ -755,6 +767,8 @@ static int32_t msm_flash_low(
+ 	int32_t i = 0;
+ 
+ 	CDBG("Enter\n");
++	msm_flash_mirror_first_string(flash_data->flash_current,
++		flash_ctrl->torch_num_sources);
+ 	/* Turn off flash triggers */
+ 	for (i = 0; i < flash_ctrl->flash_num_sources; i++)
+ 		if (flash_ctrl->flash_trigger[i])
+@@ -792,6 +806,8 @@ static int32_t msm_flash_high(
+ 	int32_t max_current = 0;
+ 	int32_t i = 0;
+ 
++	msm_flash_mirror_first_string(flash_data->flash_current,
++		flash_ctrl->flash_num_sources);
+ 	/* Turn off torch triggers */
+ 	for (i = 0; i < flash_ctrl->torch_num_sources; i++)
+ 		if (flash_ctrl->torch_trigger[i])
+diff --git a/drivers/misc/tcs3490.c b/drivers/misc/tcs3490.c
+index ccb2f0f66d4e..e0232554502d 100644
+--- a/drivers/misc/tcs3490.c
++++ b/drivers/misc/tcs3490.c
+@@ -601,7 +601,7 @@ static void tcs3490_get_als_setup_next(struct tcs3490_chip *chip)
+ 			mutex_unlock(&chip->lock);
+ 		}
+ 		cur_ktime = ktime_get();
+-		chip->als_inf.timestamp = (uint64_t)cur_ktime.tv64;
++		chip->als_inf.timestamp = (uint64_t)cur_ktime;
+ 		dev_dbg(&chip->client->dev,
+ 			"%s: Changed channel from RGBC-IR to 0x%x Time %llu\n",
+ 			__func__, chip->als_channel, chip->als_inf.timestamp);
+@@ -626,7 +626,7 @@ static void tcs3490_get_als_setup_next(struct tcs3490_chip *chip)
+ 			le16_to_cpup((const __le16 *)&buf[6]);
+ 		mutex_unlock(&chip->lock);
+ 		cur_ktime = ktime_get();
+-		chip->als_inf.timestamp = (uint64_t)cur_ktime.tv64;
++		chip->als_inf.timestamp = (uint64_t)cur_ktime;
+ 	}
+ 
+ 	sat = min_t(u32, MAX_ALS_VALUE,
+diff --git a/drivers/power/supply/qcom/qpnp-fg-gen3.c b/drivers/power/supply/qcom/qpnp-fg-gen3.c
+index afe0c8ed0bf8..039c1d4783c4 100644
+--- a/drivers/power/supply/qcom/qpnp-fg-gen3.c
++++ b/drivers/power/supply/qcom/qpnp-fg-gen3.c
+@@ -3925,6 +3925,17 @@ static int fg_psy_get_property(struct power_supply *psy,
+ 	switch (psp) {
+ 	case POWER_SUPPLY_PROP_CAPACITY:
+ 		rc = fg_get_prop_capacity(fg, &pval->intval);
++		/* lilac: spurious capacity 0 / failed read (flaky FG SRAM access) must not look like
++		 * an empty battery to mce/DSME; keep the last known value while the voltage is healthy. */
++		if (fg->last_soc > 0 && (rc < 0 || pval->intval == 0)) {
++			int vbatt_uv;
++
++			if (rc < 0 || (!fg_get_battery_voltage(fg, &vbatt_uv) &&
++				vbatt_uv > (chip->dt.cutoff_volt_mv + 250) * 1000)) {
++				pval->intval = fg->last_soc;
++				rc = 0;
++			}
++		}
+ 		break;
+ 	case POWER_SUPPLY_PROP_CAPACITY_RAW:
+ 		rc = fg_get_msoc_raw(fg, &pval->intval);
+diff --git a/drivers/soc/qcom/pil-msa.c b/drivers/soc/qcom/pil-msa.c
+index daecbc464108..6ee3b46d5113 100644
+--- a/drivers/soc/qcom/pil-msa.c
++++ b/drivers/soc/qcom/pil-msa.c
+@@ -567,6 +567,17 @@ static int pil_mss_reset(struct pil_desc *pil)
+ 	if (ret)
+ 		goto err_power;
+ 
++	/*
++	 * lilac-v2: deassert the MSS reset BEFORE enabling clocks, matching the
++	 * working 4.4 kernel. The MSS<->NoC AXI bridge clocks (gcc_mss_snoc_axi_clk,
++	 * gcc_mss_mnoc_bimc_axi_clk) cannot complete their halt handshake while the
++	 * MSS is held in reset, so enabling them first leaves them stuck at 'off'
++	 * forever and fails the MBA load with -EBUSY.
++	 */
++	ret = pil_mss_restart_reg(drv, 0);
++	if (ret)
++		goto err_clks;
++
+ 	ret = pil_mss_enable_clks(drv);
+ 	if (ret)
+ 		goto err_clks;
+@@ -576,13 +587,12 @@ static int pil_mss_reset(struct pil_desc *pil)
+ 		debug_val = readl_relaxed(drv->reg_base + QDSP6SS_DBG_CFG);
+ 	}
+ 
+-	/* Assert reset to subsystem */
+-	pil_mss_assert_resets(drv);
+-	/* Wait 6 32kHz sleep cycles for reset */
+-	udelay(200);
+-	ret = pil_mss_deassert_resets(drv);
+-	if (ret)
+-		goto err_restart;
++	/*
++	 * lilac-v2: 4.4 does no assert/deassert cycle here -- the reset was already
++	 * deasserted above, before the clocks. The 4.14 cycle exists for
++	 * PDC-sync/alt-reset capable SoCs; msm8998's DT declares neither, so it is
++	 * a no-op here apart from re-imposing the broken ordering.
++	 */
+ 
+ 	if (!pil->minidump_ss || !pil->modem_ssr) {
+ 		writel_relaxed(debug_val, drv->reg_base + QDSP6SS_DBG_CFG);
+@@ -635,11 +645,12 @@ static int pil_mss_reset(struct pil_desc *pil)
+ 
+ err_q6v5_reset:
+ 	modem_log_rmb_regs(drv->rmb_base);
+-err_restart:
+ 	pil_mss_disable_clks(drv);
+ 	if (drv->ahb_clk_vote)
+ 		clk_disable_unprepare(drv->ahb_clk);
+ err_clks:
++	/* lilac-v2: re-assert the reset we deasserted above, as 4.4 does */
++	pil_mss_restart_reg(drv, 1);
+ 	pil_mss_power_down(drv);
+ err_power:
+ 	return ret;
+diff --git a/drivers/staging/android/ion/Makefile b/drivers/staging/android/ion/Makefile
+index dc638f080d7f..e13b5457c817 100644
+--- a/drivers/staging/android/ion/Makefile
++++ b/drivers/staging/android/ion/Makefile
+@@ -1,5 +1,5 @@
+ # SPDX-License-Identifier: GPL-2.0
+-obj-$(CONFIG_ION) +=	ion.o ion-ioctl.o ion_heap.o \
++obj-$(CONFIG_ION) +=	ion.o ion-ioctl.o ion_heap.o ion_legacy.o \
+ 			ion_page_pool.o ion_system_heap.o \
+ 			ion_carveout_heap.o ion_chunk_heap.o \
+ 			ion_system_secure_heap.o ion_cma_heap.o \
+diff --git a/drivers/staging/android/ion/ion-ioctl.c b/drivers/staging/android/ion/ion-ioctl.c
+index 83cbcc0dcd8c..1e4772970488 100644
+--- a/drivers/staging/android/ion/ion-ioctl.c
++++ b/drivers/staging/android/ion/ion-ioctl.c
+@@ -19,6 +19,7 @@
+ #include <linux/uaccess.h>
+ 
+ #include "ion.h"
++#include "ion_legacy.h"
+ #include "ion_system_secure_heap.h"
+ 
+ union ion_ioctl_arg {
+@@ -59,6 +60,17 @@ long ion_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
+ 	unsigned int dir;
+ 	union ion_ioctl_arg data;
+ 
++	/*
++	 * The pre-4.12 ABI, which the msm8998 vendor blobs still speak. This
++	 * MUST be tested before the size guard below: the legacy ALLOC carries a
++	 * 32-byte struct against this union's 24, so the guard is exactly what
++	 * turns it into -EINVAL today. The smaller legacy commands would instead
++	 * fall out of the switch as -ENOTTY. Either way they never reach their
++	 * implementation without this.
++	 */
++	if (ion_legacy_is_legacy_cmd(cmd))
++		return ion_legacy_ioctl(filp, cmd, arg);
++
+ 	dir = ion_ioctl_dir(cmd);
+ 
+ 	if (_IOC_SIZE(cmd) > sizeof(data))
+diff --git a/drivers/staging/android/ion/ion.c b/drivers/staging/android/ion/ion.c
+index bac021c2c331..af5ab1be27bb 100644
+--- a/drivers/staging/android/ion/ion.c
++++ b/drivers/staging/android/ion/ion.c
+@@ -45,6 +45,7 @@
+ #include <soc/qcom/secure_buffer.h>
+ 
+ #include "ion.h"
++#include "ion_legacy.h"
+ #include "ion_secure_util.h"
+ 
+ static struct ion_device *internal_dev;
+@@ -1199,6 +1200,13 @@ int ion_query_heaps(struct ion_heap_query *query)
+ 
+ static const struct file_operations ion_fops = {
+ 	.owner          = THIS_MODULE,
++	/*
++	 * The legacy ABI scopes its handles to the open file, so every open of
++	 * /dev/ion needs a table. 4.14 had neither hook and left private_data
++	 * unused, so nothing here displaces existing behaviour.
++	 */
++	.open           = ion_legacy_open,
++	.release        = ion_legacy_release,
+ 	.unlocked_ioctl = ion_ioctl,
+ #ifdef CONFIG_COMPAT
+ 	.compat_ioctl	= ion_ioctl,
+diff --git a/drivers/staging/android/ion/ion.h b/drivers/staging/android/ion/ion.h
+index 18a9b9b08315..c3988f688997 100644
+--- a/drivers/staging/android/ion/ion.h
++++ b/drivers/staging/android/ion/ion.h
+@@ -301,6 +301,16 @@ int ion_heap_pages_zero(struct page *page, size_t size, pgprot_t pgprot);
+ 
+ int ion_alloc_fd(size_t len, unsigned int heap_id_mask, unsigned int flags);
+ 
++/*
++ * Defined in ion.c and used by ion_alloc_fd(), but never declared in a header.
++ * The legacy ABI needs the dma_buf itself rather than an fd, and this is the
++ * same entry point the modern allocation takes -- unlike ion_alloc(), which
++ * rejects every heap type but SYSTEM/HYP_CMA/SYSTEM_SECURE.
++ */
++struct dma_buf;
++struct dma_buf *ion_alloc_dmabuf(size_t len, unsigned int heap_id_mask,
++				 unsigned int flags);
++
+ /**
+  * ion_heap_init_shrinker
+  * @heap:		the heap
+diff --git a/net/bluetooth/hci_event.c b/net/bluetooth/hci_event.c
+index eca596a56f46..bbd7fff6dc90 100644
+--- a/net/bluetooth/hci_event.c
++++ b/net/bluetooth/hci_event.c
+@@ -4963,6 +4963,8 @@ static void hci_le_adv_report_evt(struct hci_dev *hdev, struct sk_buff *skb)
+ 
+ 	hci_dev_lock(hdev);
+ 
++	u8 orig_num_reports = num_reports; /* lilac-v2 diag */
++
+ 	while (num_reports--) {
+ 		struct hci_ev_le_advertising_info *ev = ptr;
+ 		s8 rssi;
+@@ -4974,13 +4976,35 @@ static void hci_le_adv_report_evt(struct hci_dev *hdev, struct sk_buff *skb)
+ 					   ev->bdaddr_type, NULL, 0, rssi,
+ 					   ev->data, ev->length);
+ 		} else {
+-			bt_dev_err(hdev, "Dropping invalid advertising data");
++			/* lilac-v2 diag */
++			bt_dev_err(hdev,
++				"Dropping invalid advertising data: bdaddr=%pMR type=%u evt_type=%u len=%u skb_len=%u remaining=%u/%u",
++				&ev->bdaddr, ev->bdaddr_type, ev->evt_type,
++				ev->length, skb->len, num_reports + 1,
++				orig_num_reports);
+ 		}
+ 
+ 		ptr += sizeof(*ev) + ev->length + 1;
+ 
+-		if (ptr > (void *) skb_tail_pointer(skb) - sizeof(*ev)) {
+-			bt_dev_err(hdev, "Malicious advertising data. Stopping processing");
++		/* lilac-v2 off-by-one fix: only
++		 * check that there's room for another report's header when
++		 * another iteration is actually coming -- num_reports==0
++		 * here means this was the last (or only) report, already
++		 * fully and correctly consumed; the while() loop's own
++		 * condition ends things cleanly on its own. Without this
++		 * guard, any single-report event that exactly fills its
++		 * buffer (ptr lands exactly at the tail, entirely valid) was
++		 * always misclassified as malicious and dropped.
++		 */
++		if (num_reports &&
++		    ptr > (void *) skb_tail_pointer(skb) - sizeof(*ev)) {
++			/* lilac-v2 diag */
++			bt_dev_err(hdev,
++				"Malicious advertising data. Stopping processing: last bdaddr=%pMR type=%u evt_type=%u len=%u skb_len=%u remaining=%u/%u offset=%ld",
++				&ev->bdaddr, ev->bdaddr_type, ev->evt_type,
++				ev->length, skb->len, num_reports + 1,
++				orig_num_reports,
++				(long)((void *)ptr - (void *)skb->data));
+ 			break;
+ 		}
+ 	}

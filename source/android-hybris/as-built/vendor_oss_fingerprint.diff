@@ -1,0 +1,29 @@
+diff --git a/Android.mk b/Android.mk
+index 176310d..514ce8a 100644
+--- a/Android.mk
++++ b/Android.mk
+@@ -5,7 +5,6 @@ LOCAL_PATH := $(call my-dir)
+ include $(CLEAR_VARS)
+ LOCAL_MODULE := android.hardware.biometrics.fingerprint@2.1-service.sony
+ LOCAL_INIT_RC := android.hardware.biometrics.fingerprint@2.1-service.sony.rc
+-LOCAL_VINTF_FRAGMENTS := android.hardware.biometrics.fingerprint.xml
+ LOCAL_PROPRIETARY_MODULE := true
+ LOCAL_MODULE_RELATIVE_PATH := hw
+ LOCAL_SRC_FILES := \
+@@ -13,6 +12,8 @@ LOCAL_SRC_FILES := \
+     QSEEComFunc.c \
+     common.c
+ 
++LOCAL_C_INCLUDES += $(LOCAL_PATH)/dmabufheap-compat
++
+ # ---------------- FPC ----------------
+ ifeq ($(filter-out loire tone,$(SOMC_PLATFORM)),)
+ LOCAL_SRC_FILES += fpc_imp_loire_tone.c
+@@ -87,7 +88,6 @@ LOCAL_SHARED_LIBRARIES := \
+     android.hardware.biometrics.fingerprint@2.1 \
+     libcutils \
+     libdl \
+-    libdmabufheap \
+     libhardware \
+     libhidlbase \
+     liblog \

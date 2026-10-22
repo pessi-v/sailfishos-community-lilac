@@ -1,0 +1,5 @@
+# Configure wake-on-WLAN (magic packet, as Android's wpa_supplicant_overlay.conf does) whenever
+# the WLAN phy registers. Without a WoWLAN config, cfg80211's
+# suspend disconnects from the AP; qcacld takes a "hard" wakelock for that deauth frame
+# (mgmt_txrx tx_cmp), which aborts every suspend attempt while WiFi is on.
+ACTION=="add", SUBSYSTEM=="ieee80211", RUN+="/usr/sbin/iw phy %k wowlan enable magic-packet"

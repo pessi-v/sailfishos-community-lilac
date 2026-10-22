@@ -1,0 +1,51 @@
+on post-fs-data
+    # Sensors
+    mkdir /data/vendor/sensors 0775 system system
+
+    # Fix sensors permissions
+    chown system system /mnt/vendor/persist/sensors/
+    chown system system /mnt/vendor/persist/sensors/error_log
+    chown system system /mnt/vendor/persist/sensors/registry/
+    chown system system /mnt/vendor/persist/sensors/registry/registry/
+    chown system system /mnt/vendor/persist/sensors/sensors_settings
+    chown system system /mnt/vendor/persist/sensors/sns.reg
+    chown system system /mnt/vendor/persist/sensors/version.txt
+
+    # /dev/sensors only supports an ioctl to get the current SLPI timestamp;
+    # allow the sensors daemon to perform this as non-root
+    chown root system /dev/sensors
+    chmod 660 /dev/sensors
+
+# Sensor service
+service vendor.sensors /odm/bin/sensors.qcom
+    class core
+    user system
+    group system
+    disabled
+
+# lilac-v2: AP-side SSC companion daemon -- genuinely
+# missing from this port's from-source /vendor build (proprietary, SODP source can't produce
+# it); without it, sensors.ssc.so's registry manager thread races against a peer that's never
+# there and every real sensor (accelerometer/ALS/proximity/magnetometer alike) intermittently
+# or permanently fails to enumerate. Sourced from this same physical device's own LineageOS
+# install on internal storage (never touched by this project's own fastboot-boot-only, RAM-only
+# workflow) -- a deliberate, flagged exception to this project's own "vendor is source, not a
+# device dump" premise, since this one piece genuinely cannot be built from source.
+# /odm/lib64/libsensor1.so is an older copy missing a symbol this binary needs
+# (sensor1_has_acessto_directory, confirmed via readelf) -- force /vendor's own newer copy to
+# resolve first, same as droid-hal-prepare.sh already does by placement order for other
+# libraries this port overrides.
+service vendor.sensors.qti /vendor/bin/sensors.qti
+    class core
+    user system
+    group system
+    disabled
+    setenv LD_LIBRARY_PATH /vendor/lib64:/vendor/lib
+
+# Enable the service after ADSP and SLPI are up
+# Note: sensorspd exists only on some devices either in
+#       form of adsp-sensorspdr or ssc-sensorspdr.
+on property:vendor.qcom.slpiup=1
+    enable vendor.sensorspd
+    enable vendor.sensors
+    enable vendor.sensors.qti

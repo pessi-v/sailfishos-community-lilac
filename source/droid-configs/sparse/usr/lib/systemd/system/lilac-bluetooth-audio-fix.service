@@ -1,0 +1,15 @@
+[Unit]
+Description=Redo wrong-role A2DP connections from the phone side after a Bluetooth toggle
+DefaultDependencies=no
+After=bluetooth.service
+Conflicts=shutdown.target
+
+[Service]
+Type=simple
+ExecStart=/bin/sh /usr/bin/droid/lilac-bluetooth-audio-fix.sh
+Restart=always
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

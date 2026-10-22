@@ -1,0 +1,10 @@
+[Unit]
+Description=droid-hal-prepare (fix /system ELOOP, factory/build lib+binary skew)
+DefaultDependencies=no
+After=local-fs.target
+Before=droid-hal-init.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/droid/droid-hal-prepare.sh

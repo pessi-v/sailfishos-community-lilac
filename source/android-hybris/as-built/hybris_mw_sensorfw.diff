@@ -1,0 +1,323 @@
+diff --git a/adaptors/hybrisgyroscopeadaptor/hybrisgyroscopeadaptor.cpp b/adaptors/hybrisgyroscopeadaptor/hybrisgyroscopeadaptor.cpp
+index 23bd7a9..24fe290 100644
+--- a/adaptors/hybrisgyroscopeadaptor/hybrisgyroscopeadaptor.cpp
++++ b/adaptors/hybrisgyroscopeadaptor/hybrisgyroscopeadaptor.cpp
+@@ -22,6 +22,8 @@
+ #include "datatypes/utils.h"
+ #include "config.h"
+ #include <math.h>
++#include <QFile>
++#include <QTextStream>
+ 
+ HybrisGyroscopeAdaptor::HybrisGyroscopeAdaptor(const QString& id) :
+     HybrisAdaptor(id,SENSOR_TYPE_GYROSCOPE)
+@@ -35,6 +37,32 @@ HybrisGyroscopeAdaptor::HybrisGyroscopeAdaptor(const QString& id) :
+         qCWarning(lcSensorFw) << NodeBase::id() << "Path does not exists: " << powerStatePath;
+     	powerStatePath.clear();
+     }
++    // lilac-v2: see hybrisgyroscopeadaptor.h's own comment.
++    // Absent keys default to 0.0 (QVariant::toDouble() on an invalid/empty QVariant), so this
++    // is a no-op everywhere this config key was never written.
++    biasX = SensorFrameworkConfig::configuration()->value("gyroscope/bias_x").toDouble();
++    biasY = SensorFrameworkConfig::configuration()->value("gyroscope/bias_y").toDouble();
++    biasZ = SensorFrameworkConfig::configuration()->value("gyroscope/bias_z").toDouble();
++    lastPersistedX = biasX;
++    lastPersistedY = biasY;
++    lastPersistedZ = biasZ;
++    sumX = sumY = sumZ = 0.0;
++    stationaryCount = 0;
++    convergenceCountThisBoot = 0;
++    // lilac-v2: kept only for the startup log line below;
++    // maybeUpdateCalibration() no longer uses this to decide how strongly to trust a new
++    // measurement (see that function's own comment for why: a config file with real-looking
++    // numbers doesn't mean THIS device produced them).
++    everCalibrated = (biasX != 0.0 || biasY != 0.0 || biasZ != 0.0);
++    if (everCalibrated)
++        // NodeBase::id(), not id() -- this constructor's own parameter is also named "id"
++        // and shadows the base class method here (the same reason the powerstate_path
++        // warning two lines above already had to qualify it the same way).
++        qCInfo(lcSensorFw) << NodeBase::id() << "HybrisGyroscopeAdaptor starting from saved calibration:"
++                            << biasX << biasY << biasZ << "deg/s -- will keep refining live";
++    else
++        qCInfo(lcSensorFw) << NodeBase::id() << "HybrisGyroscopeAdaptor has no saved calibration yet"
++                            << "-- will auto-calibrate the first time the device is stationary";
+     unsigned int interval_us = 50 * 1000;
+     setDefaultInterval(interval_us);
+ }
+@@ -69,14 +97,102 @@ void HybrisGyroscopeAdaptor::processSample(const sensors_event_t& data)
+     TimedXyzData *d = buffer->nextSlot();
+     d->timestamp_ = quint64(data.timestamp * .001);
+ #ifdef USE_BINDER
+-    d->x_ = (data.u.vec3.x) * RADIANS_TO_DEGREES * 1000;
+-    d->y_ = (data.u.vec3.y) * RADIANS_TO_DEGREES * 1000;
+-    d->z_ = (data.u.vec3.z) * RADIANS_TO_DEGREES * 1000;
++    qreal rawX = (data.u.vec3.x) * RADIANS_TO_DEGREES;
++    qreal rawY = (data.u.vec3.y) * RADIANS_TO_DEGREES;
++    qreal rawZ = (data.u.vec3.z) * RADIANS_TO_DEGREES;
+ #else
+-    d->x_ = (data.gyro.x) * RADIANS_TO_DEGREES * 1000;
+-    d->y_ = (data.gyro.y) * RADIANS_TO_DEGREES * 1000;
+-    d->z_ = (data.gyro.z) * RADIANS_TO_DEGREES * 1000;
++    qreal rawX = (data.gyro.x) * RADIANS_TO_DEGREES;
++    qreal rawY = (data.gyro.y) * RADIANS_TO_DEGREES;
++    qreal rawZ = (data.gyro.z) * RADIANS_TO_DEGREES;
+ #endif
++    maybeUpdateCalibration(rawX, rawY, rawZ);
++    d->x_ = rawX * 1000 - biasX * 1000;
++    d->y_ = rawY * 1000 - biasY * 1000;
++    d->z_ = rawZ * 1000 - biasZ * 1000;
+     buffer->commit();
+     buffer->wakeUpReaders();
+ }
++
++void HybrisGyroscopeAdaptor::maybeUpdateCalibration(qreal rawX, qreal rawY, qreal rawZ)
++{
++    // lilac-v2: A gyroscope reads angular velocity, not
++    // orientation -- "stationary" is a valid, useful signal at any orientation, not only flat
++    // on a table (that instruction is for the human, to hold genuinely still -- not a technical
++    // requirement of this check). Same idea as chains/magcalibrationchain's CalibrationFilter
++    // just above in this tree: run continuously, in-process, inside this already-root daemon.
++    const qreal STATIONARY_THRESHOLD_DEG_S = 3.0;
++    const int SAMPLES_NEEDED = 60; // ~3s at this adaptor's own 50ms default interval
++    const qreal REFINEMENT_ALPHA = 0.3;
++    const qreal PERSIST_EPSILON_DEG_S = 0.01;
++
++    if (qAbs(rawX) > STATIONARY_THRESHOLD_DEG_S || qAbs(rawY) > STATIONARY_THRESHOLD_DEG_S
++            || qAbs(rawZ) > STATIONARY_THRESHOLD_DEG_S) {
++        sumX = sumY = sumZ = 0.0;
++        stationaryCount = 0;
++        return;
++    }
++
++    sumX += rawX;
++    sumY += rawY;
++    sumZ += rawZ;
++    if (++stationaryCount < SAMPLES_NEEDED)
++        return;
++
++    qreal estimateX = sumX / stationaryCount;
++    qreal estimateY = sumY / stationaryCount;
++    qreal estimateZ = sumZ / stationaryCount;
++    sumX = sumY = sumZ = 0.0;
++    stationaryCount = 0;
++
++    // lilac-v2: "has this device ever been calibrated" used
++    // to gate a fast, direct-replacement update vs. a gentle 30%-blend refinement, but that was
++    // decided from "does a config file with non-zero values exist", which a genuinely different
++    // physical device inheriting this project's own checked-in seed would satisfy immediately --
++    // routing its own first real measurements through the *gentle* path meant for polishing an
++    // already-good estimate, taking ~6-7 real convergences (not just one) to displace a wrong
++    // inherited value. Use a fast weight for this boot's own first few real convergences
++    // instead, regardless of what was loaded at startup: correctly and identically handles a
++    // brand new device (no seed at all) and one that inherited a wrong seed from a different
++    // physical unit, with no need to tell those two cases apart. An already-well-calibrated
++    // device's "fast" updates just reconfirm the same good value each time -- no regression.
++    const int FAST_CONVERGENCES_PER_BOOT = 5;
++    qreal alpha = (convergenceCountThisBoot < FAST_CONVERGENCES_PER_BOOT) ? 1.0 : REFINEMENT_ALPHA;
++    biasX = biasX * (1.0 - alpha) + estimateX * alpha;
++    biasY = biasY * (1.0 - alpha) + estimateY * alpha;
++    biasZ = biasZ * (1.0 - alpha) + estimateZ * alpha;
++    convergenceCountThisBoot++;
++    everCalibrated = true;
++
++    if (qAbs(biasX - lastPersistedX) > PERSIST_EPSILON_DEG_S
++            || qAbs(biasY - lastPersistedY) > PERSIST_EPSILON_DEG_S
++            || qAbs(biasZ - lastPersistedZ) > PERSIST_EPSILON_DEG_S) {
++        persistCalibration();
++    }
++}
++
++void HybrisGyroscopeAdaptor::persistCalibration()
++{
++    // lilac-v2: the same path
++    // patch-sensorfw-gyro-bias-calibration.py's config-read mechanism already reads at startup,
++    // and the same file this project checks in with a real, live-measured seed value.
++    static const QString path = QStringLiteral("/etc/sensorfw/sensord.conf.d/90-lilac-gyro-calibration.conf");
++    QFile f(path);
++    if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text)) {
++        qCWarning(lcSensorFw) << NodeBase::id() << "Could not write gyroscope calibration to" << path;
++        return;
++    }
++    QTextStream out(&f);
++    out << "# lilac-v2: auto-calibrated live by sensorfwd\n";
++    out << "# itself; do not edit by hand, it will be overwritten the next time the device\n";
++    out << "# is stationary for a few seconds.\n";
++    out << "[gyroscope]\n";
++    out << "bias_x = " << biasX << "\n";
++    out << "bias_y = " << biasY << "\n";
++    out << "bias_z = " << biasZ << "\n";
++    f.close();
++    lastPersistedX = biasX;
++    lastPersistedY = biasY;
++    lastPersistedZ = biasZ;
++    qCInfo(lcSensorFw) << NodeBase::id() << "HybrisGyroscopeAdaptor persisted gyroscope calibration:"
++                        << biasX << biasY << biasZ << "deg/s";
++}
+diff --git a/adaptors/hybrisgyroscopeadaptor/hybrisgyroscopeadaptor.h b/adaptors/hybrisgyroscopeadaptor/hybrisgyroscopeadaptor.h
+index 77818a0..3a1f20a 100644
+--- a/adaptors/hybrisgyroscopeadaptor/hybrisgyroscopeadaptor.h
++++ b/adaptors/hybrisgyroscopeadaptor/hybrisgyroscopeadaptor.h
+@@ -56,6 +56,28 @@ private:
+     DeviceAdaptorRingBuffer<TimedXyzData>* buffer;
+     int sensorType;
+     QByteArray powerStatePath;
++    // lilac-v2: zero-rate bias correction this platform's own
++    // vendor HAL never applies (see that section for why); degrees/second, matching what
++    // clients see, read once at startup from a userspace calibration tool's config write.
++    qreal biasX;
++    qreal biasY;
++    qreal biasZ;
++    // lilac-v2: live auto-calibration, the same shape as this
++    // tree's own chains/magcalibrationchain/calibrationfilter.cpp: runs continuously, entirely
++    // in-process, inside this already-root daemon.
++    qreal lastPersistedX;
++    qreal lastPersistedY;
++    qreal lastPersistedZ;
++    qreal sumX;
++    qreal sumY;
++    qreal sumZ;
++    int stationaryCount;
++    bool everCalibrated;
++    // lilac-v2: per-boot, not persisted; see
++    // maybeUpdateCalibration()'s own comment for why this exists.
++    int convergenceCountThisBoot;
++    void maybeUpdateCalibration(qreal rawX, qreal rawY, qreal rawZ);
++    void persistCalibration();
+ 
+ };
+ #endif
+diff --git a/core/hybrisadaptor.cpp b/core/hybrisadaptor.cpp
+index f52ca29..d51e493 100644
+--- a/core/hybrisadaptor.cpp
++++ b/core/hybrisadaptor.cpp
+@@ -849,6 +849,13 @@ HybrisAdaptor::HybrisAdaptor(const QString& id, int type)
+     , m_sensorHandle(-1)
+     , m_sensorType(type)
+ {
++    // lilac-v2: diagnostic only, no behavior change. Logs
++    // which adaptor construction is the first to ever call hybrisManager() (the lazy singleton
++    // accessor whose first call constructs HybrisManager and runs HybridBackendHal::
++    // initialize()'s hw_get_module() probe) -- settles which sensor type actually triggers
++    // that probe, and whether *that* construction is the one that fails.
++    qCWarning(lcSensorFw) << "lilac-v2 diag: HybrisAdaptor construct id=" << id
++                            << "type=" << type << "sensorTypeName=" << sensorTypeName(type);
+     m_sensorHandle = hybrisManager()->handleForType(m_sensorType);
+     if (m_sensorHandle == -1) {
+         qCWarning(lcSensorFw) << Q_FUNC_INFO <<"no such sensor" << id;
+diff --git a/core/hybrisbackend_hal.cpp b/core/hybrisbackend_hal.cpp
+index 7727cc8..5635388 100644
+--- a/core/hybrisbackend_hal.cpp
++++ b/core/hybrisbackend_hal.cpp
+@@ -60,12 +60,46 @@ HybrisBackendHal::~HybrisBackendHal()
+     }
+ }
+ 
++// lilac-v2: every failure path in initialize() below used to
++// call QCoreApplication::exit(EXIT_FAILURE), killing the *entire* sensorfwd daemon over a
++// single failed probe for whichever sensor type happened to trigger this process-wide,
++// one-time singleton construction first -- confirmed in section 140 to not even be
++// hardware-type-specific (accelerometer, independently known-working, failed exactly the same
++// way light/ALS always has), and traced in section 141 to a QMI service (SMGR) on the remote
++// SLPI DSP not responding in time, over an otherwise-healthy link to an otherwise-healthy,
++// ONLINE DSP -- a platform/firmware characteristic this file cannot fix directly. This helper
++// leaves m_halModule/m_halDevice/m_sensorCount/m_sensorArray in the same "nothing loaded" state
++// a brand-new HybrisBackendHal already starts in, and simply returns instead of exiting:
++// HybrisManager::initManager() (which populates every type/handle index lookup) is only ever
++// reached from the tail of a *successful* initialize(), so skipping it here leaves those maps
++// empty -- their ordinary default state, not a new one -- and every HybrisAdaptor's own
++// constructor already handles that gracefully and non-fatally (`if (m_sensorHandle == -1) {
++// ...; setValid(false); return; }`, the existing, already-proven-safe pattern for every sensor
++// type, not something invented here). The daemon survives; the sensor types depending on this
++// particular HAL path individually, gracefully report themselves unavailable, exactly as any
++// single already-unsupported sensor type already does today.
++void HybrisBackendHal::giveUpGracefully()
++{
++    m_halModule = nullptr;
++    m_halDevice = nullptr;
++    m_sensorCount = 0;
++    m_sensorArray = nullptr;
++}
++
+ void HybrisBackendHal::initialize()
+ {
+     int err;
+ 
+     /* Open android sensor plugin */
+-    for (int retries = 4; ;) {
++    // lilac-v2: this probe runs once, synchronously, in
++    // HybrisManager's process-wide-singleton constructor, shared by every sensor type, not
++    // just whichever adaptor happens to trigger it first. 4 retries at 2s apart (~8-10s) is not
++    // enough patience for this device's own, independently-confirmed boot-time HAL-loading
++    // contention (the same class of problem already fixed for sensorfwd.service/polkit.service/
++    // systemd-hostnamed.service via a TimeoutStartSec bump, sections 133/134) -- raised to 40
++    // retries (~80s) to match. If the HAL genuinely never loads, this only delays the same,
++    // otherwise-unavoidable failure; it introduces no new failure mode.
++    for (int retries = 40; ;) {
+         // Try module loading in throwaway child process
+         // so that we can retry from clean slate if needed
+         fflush(nullptr);
+@@ -80,14 +114,14 @@ void HybrisBackendHal::initialize()
+ 
+         if (child_pid == -1) {
+             qCWarning(lcSensorFw) << "w_get_module() probe, fork failed:" << strerror(errno);
+-            QCoreApplication::exit(EXIT_FAILURE);
++            giveUpGracefully();
+             return;
+         }
+ 
+         int status = 0;
+         if (waitpid(child_pid, &status, 0) == -1) {
+             qCWarning(lcSensorFw) << "w_get_module() probe, waitpid failed:" << strerror(errno);
+-            QCoreApplication::exit(EXIT_FAILURE);
++            giveUpGracefully();
+             return;
+         }
+ 
+@@ -99,15 +133,14 @@ void HybrisBackendHal::initialize()
+                 break;
+ 
+             qCWarning(lcSensorFw) << "hw_get_module() failed:" << strerror(-err);
+-            m_halModule = nullptr;
+-            QCoreApplication::exit(EXIT_FAILURE);
++            giveUpGracefully();
+             return;
+         }
+ 
+         // Bailout or retry after brief delay
+         if (--retries < 0) {
+             qCWarning(lcSensorFw) << "hw_get_module() probe failed - giving up";
+-            QCoreApplication::exit(EXIT_FAILURE);
++            giveUpGracefully();
+             return;
+         }
+ 
+@@ -120,7 +153,7 @@ void HybrisBackendHal::initialize()
+     if (err != 0) {
+         m_halDevice = 0;
+         qCWarning(lcSensorFw) << "sensors_open() failed:" << strerror(-err);
+-        QCoreApplication::exit(EXIT_FAILURE);
++        giveUpGracefully();
+         return;
+     }
+ 
+@@ -128,7 +161,7 @@ void HybrisBackendHal::initialize()
+     m_sensorCount = m_halModule->get_sensors_list(m_halModule, &m_sensorArray);
+     if (m_sensorCount <= 0) {
+         qCWarning(lcSensorFw) << "no sensors found";
+-        QCoreApplication::exit(EXIT_FAILURE);
++        giveUpGracefully();
+         return;
+     }
+ 
+diff --git a/core/hybrisbackend_hal.h b/core/hybrisbackend_hal.h
+index cc4a28c..a5d7562 100644
+--- a/core/hybrisbackend_hal.h
++++ b/core/hybrisbackend_hal.h
+@@ -31,6 +31,7 @@ public:
+     ~HybrisBackendHal();
+     static HybrisBackend *getBackend(HybrisManager *manager);
+     void initialize() override;
++    void giveUpGracefully();  // lilac-v2: see the .cpp
+     bool needsReaderThread() override;
+     bool needsWakeup(const sensors_event_t *eve) override;
+     bool isValid(const sensors_event_t *eve) override;

@@ -1,0 +1,18 @@
+[Unit]
+Description=Bring up modem and WLAN (class_start never fires on this hybris boot)
+DefaultDependencies=no
+After=droid-hal-init.service
+Conflicts=shutdown.target
+
+[Service]
+# Type=simple, not oneshot: this runs for up to a couple of minutes waiting on
+# the modem and WLAN firmware, and a oneshot wanted by a real target would hold
+# boot behind it. Never blocks or fails the boot -- every path in the script
+# exits 0 and writes its diagnosis to /var/log/lilac-coproc-bringup.log.
+Type=simple
+ExecStart=/bin/sh /usr/bin/droid/lilac-coproc-bringup.sh
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

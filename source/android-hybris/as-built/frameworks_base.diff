@@ -1,0 +1,219 @@
+diff --git a/packages/SystemUI/res/values/config.xml b/packages/SystemUI/res/values/config.xml
+index 9530a74d0ece..5c80ea88b70a 100644
+--- a/packages/SystemUI/res/values/config.xml
++++ b/packages/SystemUI/res/values/config.xml
+@@ -87,11 +87,20 @@
+     <bool name="config_dead_zone_flash">false</bool>
+ 
+     <!-- Whether to enable dimming navigation buttons when wallpaper is not visible, should be
+-         enabled for OLED devices to reduce/prevent burn in on the navigation bar (because of the
++         enabled for OLED devices to reduce/prevent burn-in on the navigation bar (because of the
+          black background and static button placements) and disabled for all other devices to
+          prevent wasting cpu cycles on the dimming animation -->
+     <bool name="config_navigation_bar_enable_auto_dim_no_visible_wallpaper">true</bool>
+ 
++    <!-- Whether to enable shifting of elements in the status bar and the navigation bar.
++         Should be enabled for OLED devices to reduce/prevent burn-in on the status bar
++         and on the navigation bar and disabled for all other devices. -->
++    <bool name="config_statusBarBurnInProtection">false</bool>
++
++    <!-- Amount of time in seconds to wait before shifting elements around when the burn-in
++         protection is enabled for status bar and navigation bar -->
++    <integer name="config_shift_interval">60</integer>
++
+     <!-- The maximum number of tiles in the QuickQSPanel -->
+     <integer name="quick_qs_panel_max_columns">6</integer>
+ 
+diff --git a/packages/SystemUI/res/values/dimens.xml b/packages/SystemUI/res/values/dimens.xml
+index f002a271a43b..f7065aa7b37e 100644
+--- a/packages/SystemUI/res/values/dimens.xml
++++ b/packages/SystemUI/res/values/dimens.xml
+@@ -1075,6 +1075,14 @@
+     <!-- The maximum offset in either direction that icons move to prevent burn-in on AOD. -->
+     <dimen name="default_burn_in_prevention_offset">15dp</dimen>
+ 
++    <!-- The maximum offset in either direction that elements are moved vertically to prevent
++         burn-in on status bar and navigation bar. -->
++    <dimen name="vertical_max_shift">1.0dp</dimen>
++
++    <!-- The maximum offset in either direction that elements are moved horizontally to prevent
++         burn-in on status bar and navigation bar. -->
++    <dimen name="horizontal_max_shift">3.0dp</dimen>
++
+     <dimen name="corner_size">8dp</dimen>
+     <dimen name="top_padding">0dp</dimen>
+     <dimen name="bottom_padding">48dp</dimen>
+diff --git a/packages/SystemUI/src/com/android/systemui/statusbar/phone/NavigationBarView.java b/packages/SystemUI/src/com/android/systemui/statusbar/phone/NavigationBarView.java
+index 5bb3c836586c..051ffd525bd3 100644
+--- a/packages/SystemUI/src/com/android/systemui/statusbar/phone/NavigationBarView.java
++++ b/packages/SystemUI/src/com/android/systemui/statusbar/phone/NavigationBarView.java
+@@ -168,6 +168,13 @@ public class NavigationBarView extends FrameLayout implements
+     @Nullable
+     private Rect mOrientedHandleSamplingRegion;
+ 
++    private int mBasePaddingBottom;
++    private int mBasePaddingLeft;
++    private int mBasePaddingRight;
++    private int mBasePaddingTop;
++
++    private ViewGroup mNavigationBarContents;
++
+     private class NavTransitionListener implements TransitionListener {
+         private boolean mBackTransitioning;
+         private boolean mHomeAppearing;
+@@ -883,6 +890,18 @@ public class NavigationBarView extends FrameLayout implements
+         mRecentsOnboarding.hide(true);
+     }
+ 
++    public void shiftNavigationBarItems(int horizontalShift, int verticalShift) {
++        if (mNavigationBarContents == null) {
++            return;
++        }
++
++        mNavigationBarContents.setPaddingRelative(mBasePaddingLeft + horizontalShift,
++                                              mBasePaddingTop + verticalShift,
++                                              mBasePaddingRight + horizontalShift,
++                                              mBasePaddingBottom - verticalShift);
++        invalidate();
++    }
++
+     @Override
+     public void onFinishInflate() {
+         super.onFinishInflate();
+@@ -891,6 +910,13 @@ public class NavigationBarView extends FrameLayout implements
+ 
+         getImeSwitchButton().setOnClickListener(mImeSwitcherClickListener);
+ 
++        mNavigationBarContents = (ViewGroup) findViewById(R.id.nav_buttons);
++
++        mBasePaddingLeft = mNavigationBarContents.getPaddingStart();
++        mBasePaddingTop = mNavigationBarContents.getPaddingTop();
++        mBasePaddingRight = mNavigationBarContents.getPaddingEnd();
++        mBasePaddingBottom = mNavigationBarContents.getPaddingBottom();
++
+         Divider divider = Dependency.get(Divider.class);
+         divider.registerInSplitScreenListener(mDockedListener);
+         updateOrientationViews();
+diff --git a/packages/SystemUI/src/com/android/systemui/statusbar/phone/PhoneStatusBarView.java b/packages/SystemUI/src/com/android/systemui/statusbar/phone/PhoneStatusBarView.java
+index 7c41bcd09b57..c139d00559b4 100644
+--- a/packages/SystemUI/src/com/android/systemui/statusbar/phone/PhoneStatusBarView.java
++++ b/packages/SystemUI/src/com/android/systemui/statusbar/phone/PhoneStatusBarView.java
+@@ -23,6 +23,7 @@ import static java.lang.Float.isNaN;
+ import android.annotation.Nullable;
+ import android.content.Context;
+ import android.content.res.Configuration;
++import android.content.res.Resources;
+ import android.graphics.Rect;
+ import android.util.AttributeSet;
+ import android.util.EventLog;
+@@ -52,6 +53,13 @@ public class PhoneStatusBarView extends PanelBar {
+     private static final boolean DEBUG_GESTURES = false;
+     private final CommandQueue mCommandQueue;
+ 
++    private int mBasePaddingBottom;
++    private int mBasePaddingLeft;
++    private int mBasePaddingRight;
++    private int mBasePaddingTop;
++
++    private ViewGroup mStatusBarContents;
++
+     StatusBar mBar;
+ 
+     boolean mIsFullyOpenedPanel = false;
+@@ -96,6 +104,18 @@ public class PhoneStatusBarView extends PanelBar {
+         mScrimController = scrimController;
+     }
+ 
++    public void shiftStatusBarItems(int horizontalShift, int verticalShift) {
++        if (mStatusBarContents == null) {
++            return;
++        }
++
++        mStatusBarContents.setPaddingRelative(mBasePaddingLeft + horizontalShift,
++                                              mBasePaddingTop + verticalShift,
++                                              mBasePaddingRight + horizontalShift,
++                                              mBasePaddingBottom - verticalShift);
++        invalidate();
++    }
++
+     @Override
+     public void onFinishInflate() {
+         mBattery = findViewById(R.id.battery);
+@@ -103,6 +123,13 @@ public class PhoneStatusBarView extends PanelBar {
+         mCenterIconSpace = findViewById(R.id.centered_icon_area);
+ 
+         updateResources();
++
++        mStatusBarContents = (ViewGroup) findViewById(R.id.status_bar_contents);
++
++        mBasePaddingLeft = mStatusBarContents.getPaddingStart();
++        mBasePaddingTop = mStatusBarContents.getPaddingTop();
++        mBasePaddingRight = mStatusBarContents.getPaddingEnd();
++        mBasePaddingBottom = mStatusBarContents.getPaddingBottom();
+     }
+ 
+     @Override
+diff --git a/packages/SystemUI/src/com/android/systemui/statusbar/phone/StatusBar.java b/packages/SystemUI/src/com/android/systemui/statusbar/phone/StatusBar.java
+index f125b7d10035..1285169868fa 100644
+--- a/packages/SystemUI/src/com/android/systemui/statusbar/phone/StatusBar.java
++++ b/packages/SystemUI/src/com/android/systemui/statusbar/phone/StatusBar.java
+@@ -214,6 +214,7 @@ import com.android.systemui.statusbar.phone.dagger.StatusBarComponent;
+ import com.android.systemui.statusbar.phone.dagger.StatusBarPhoneModule;
+ import com.android.systemui.statusbar.policy.BatteryController;
+ import com.android.systemui.statusbar.policy.BrightnessMirrorController;
++import com.android.systemui.statusbar.policy.BurnInProtectionController;
+ import com.android.systemui.statusbar.policy.ConfigurationController;
+ import com.android.systemui.statusbar.policy.ConfigurationController.ConfigurationListener;
+ import com.android.systemui.statusbar.policy.DeviceProvisionedController;
+@@ -344,6 +345,9 @@ public class StatusBar extends SystemUI implements DemoMode,
+     @Nullable
+     protected LockscreenWallpaper mLockscreenWallpaper;
+     private final AutoHideController mAutoHideController;
++
++    private BurnInProtectionController mBurnInProtectionController;
++
+     @Nullable
+     private final KeyguardLiftController mKeyguardLiftController;
+ 
+@@ -1085,6 +1089,8 @@ public class StatusBar extends SystemUI implements DemoMode,
+                             mStatusBarView.findViewById(R.id.notification_lights_out));
+                     mNotificationShadeWindowViewController.setStatusBarView(mStatusBarView);
+                     checkBarModes();
++                    mBurnInProtectionController =
++                        new BurnInProtectionController(mContext, this, mStatusBarView);
+                 }).getFragmentManager()
+                 .beginTransaction()
+                 .replace(R.id.status_bar_container, new CollapsedStatusBarFragment(),
+@@ -3763,6 +3769,9 @@ public class StatusBar extends SystemUI implements DemoMode,
+ 
+             updateNotificationPanelTouchState();
+             mNotificationShadeWindowViewController.cancelCurrentTouch();
++            if (mBurnInProtectionController != null) {
++                mBurnInProtectionController.stopShiftTimer();
++            }
+             if (mLaunchCameraOnFinishedGoingToSleep) {
+                 mLaunchCameraOnFinishedGoingToSleep = false;
+ 
+@@ -3818,6 +3827,9 @@ public class StatusBar extends SystemUI implements DemoMode,
+                 mLaunchCameraWhenFinishedWaking = false;
+             }
+             updateScrimController();
++            if (mBurnInProtectionController != null) {
++                mBurnInProtectionController.startShiftTimer();
++            }
+         }
+     };
+ 
+diff --git a/services/core/java/com/android/server/StorageManagerService.java b/services/core/java/com/android/server/StorageManagerService.java
+index 392894616bf4..0199a585a551 100644
+--- a/services/core/java/com/android/server/StorageManagerService.java
++++ b/services/core/java/com/android/server/StorageManagerService.java
+@@ -1535,6 +1535,8 @@ class StorageManagerService extends IStorageManager.Stub
+             // public API requirement of being in a stable location.
+             if (vol.disk.isAdoptable()) {
+                 vol.mountFlags |= VolumeInfo.MOUNT_FLAG_VISIBLE;
++            } else if (vol.disk.isSd()) {
++                vol.mountFlags |= VolumeInfo.MOUNT_FLAG_VISIBLE;
+             }
+ 
+             vol.mountUserId = mCurrentUserId;

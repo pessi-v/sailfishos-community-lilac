@@ -1,0 +1,1303 @@
+diff --git a/arch/arm64/boot/dts/qcom/msm8998-vidc.dtsi b/arch/arm64/boot/dts/qcom/msm8998-vidc.dtsi
+index b8d6134a96bb..3f7f08393bed 100644
+--- a/arch/arm64/boot/dts/qcom/msm8998-vidc.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8998-vidc.dtsi
+@@ -72,7 +72,11 @@
+ 			<465000000 8490000>; /* imem @ turbo freq 406 Mhz */
+ 
+ 		/* Regulators */
+-		smmu-vdd-supply = <&gdsc_bimc_smmu>;
++		/* lilac: no smmu-vdd-supply. gdsc_bimc_smmu is status="disabled" here as it
++		 * is on 4.4, and naming an unregistered provider makes this kernel return
++		 * -EPROBE_DEFER where 4.4 fell back to a dummy. Omitting it gives -ENODEV
++		 * -> dummy, i.e. exactly the rail Venus has always had on 4.4.
++		 * */
+ 		venus-supply = <&gdsc_venus>;
+ 		venus-core0-supply = <&gdsc_venus_core0>;
+ 		venus-core1-supply = <&gdsc_venus_core1>;
+diff --git a/arch/arm64/boot/dts/qcom/msm8998-yoshino-common.dtsi b/arch/arm64/boot/dts/qcom/msm8998-yoshino-common.dtsi
+index 09daa7b5814f..2e8c3e67564a 100644
+--- a/arch/arm64/boot/dts/qcom/msm8998-yoshino-common.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8998-yoshino-common.dtsi
+@@ -28,15 +28,20 @@
+ 	};
+ 
+ 	reserved-memory {
++		/* lilac: LineageOS-compatible ramoops geometry, so a failed boot's console
++		 * log can be read back from LineageOS at /sys/fs/pstore/ afterward.
++		 * This kernel's own sizes were record 0x10000 / console 0x60000 /
++		 * ftrace 0x10000 / pmsg 0x20000 / ecc 16.
++		 */
+ 		ramoops@ffc00000 {
+ 			compatible = "removed-dma-pool", "ramoops";
+ 			no-map;
+ 			reg = <0 0xffc00000 0 0x00100000>;
+-			record-size = <0x10000>;
+-			console-size = <0x60000>;
+-			ftrace-size = <0x10000>;
+-			pmsg-size = <0x20000>;
+-			ecc-size = <16>;
++			record-size = <0x1000>;
++			console-size = <0x40000>;
++			ftrace-size = <0x0>;
++			pmsg-size = <0x0>;
++			ecc-size = <0x0>;
+ 		};
+ 	};
+ 
+diff --git a/arch/arm64/boot/dts/qcom/msm8998.dtsi b/arch/arm64/boot/dts/qcom/msm8998.dtsi
+index a4825bc5543f..3bd932eeb8d2 100644
+--- a/arch/arm64/boot/dts/qcom/msm8998.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8998.dtsi
+@@ -638,7 +638,7 @@
+ 		interrupt-controller;
+ 		#interrupt-cells = <4>;
+ 		cell-index = <0>;
+-		qcom,enable-ahb-bus-workaround;
++		/* lilac: AHB workaround removed -- reads cnfg+0x6000 outside the 0x3000 cnfg mapping and panics at qpnp_pon probe */
+ 	};
+ 
+ 	qcom,sps {
+diff --git a/arch/arm64/configs/aosp_yoshino_lilac_defconfig b/arch/arm64/configs/aosp_yoshino_lilac_defconfig
+index 95e808cf82b5..bf995c88d98c 100644
+--- a/arch/arm64/configs/aosp_yoshino_lilac_defconfig
++++ b/arch/arm64/configs/aosp_yoshino_lilac_defconfig
+@@ -1,4 +1,3 @@
+-# CONFIG_FHANDLE is not set
+ CONFIG_AUDIT=y
+ CONFIG_NO_HZ=y
+ CONFIG_HIGH_RES_TIMERS=y
+@@ -22,8 +21,6 @@ CONFIG_CGROUP_FREEZER=y
+ CONFIG_CGROUP_CPUACCT=y
+ CONFIG_CGROUP_BPF=y
+ CONFIG_NAMESPACES=y
+-# CONFIG_UTS_NS is not set
+-# CONFIG_PID_NS is not set
+ CONFIG_SCHED_TUNE=y
+ CONFIG_DEFAULT_USE_ENERGY_AWARE=y
+ CONFIG_BLK_DEV_INITRD=y
+@@ -42,7 +39,7 @@ CONFIG_EMBEDDED=y
+ CONFIG_PROFILING=y
+ CONFIG_KPROBES=y
+ CONFIG_JUMP_LABEL=y
+-CONFIG_CC_STACKPROTECTOR_REGULAR=y
++CONFIG_CC_STACKPROTECTOR_NONE=y
+ CONFIG_ARCH_MMAP_RND_COMPAT_BITS=16
+ # CONFIG_VMAP_STACK is not set
+ CONFIG_REFCOUNT_FULL=y
+@@ -84,7 +81,8 @@ CONFIG_ARM64_SW_TTBR0_PAN=y
+ CONFIG_BUILD_ARM64_APPENDED_DTB_IMAGE=y
+ # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
+ CONFIG_COMPAT=y
+-CONFIG_COMPAT_VDSO=y
++# CONFIG_COMPAT_VDSO is not set
++CONFIG_ARM_ARCH_TIMER_VCT_ACCESS=y
+ CONFIG_PM_WAKELOCKS=y
+ CONFIG_PM_WAKELOCKS_LIMIT=0
+ # CONFIG_PM_WAKELOCKS_GC is not set
+@@ -298,7 +296,6 @@ CONFIG_DM_VERITY_FEC=y
+ CONFIG_DM_ANDROID_VERITY=y
+ CONFIG_DM_BOW=y
+ CONFIG_NETDEVICES=y
+-CONFIG_DUMMY=y
+ CONFIG_MACVLAN=y
+ CONFIG_MACVTAP=y
+ CONFIG_IPVLAN=y
+@@ -420,7 +417,7 @@ CONFIG_INPUT_GPIO=y
+ CONFIG_INPUT_BU520X1NVX=y
+ CONFIG_FPC1145_PLATFORM=y
+ CONFIG_SERIO_LIBPS2=y
+-# CONFIG_VT is not set
++CONFIG_VT=y
+ # CONFIG_LEGACY_PTYS is not set
+ # CONFIG_DEVMEM is not set
+ CONFIG_SERIAL_MSM=y
+@@ -517,6 +514,12 @@ CONFIG_MSMB_JPEG=y
+ CONFIG_MSM_FD=y
+ CONFIG_MSM_JPEGDMA=y
+ CONFIG_SONY_CAM_V4L2=y
++# lilac 10.180: the AMS tcs3490 RGBC-IR sensor. excalibur's camera
++# HAL reads /sys/devices/virtual/input/rgbcir_sensor/chip_pow during
++# init and aborts (num 0 cameras) if it is absent. Driver source and
++# the tcs3490@72 DT node are already in the tree; only this switch was
++# dropped from the 4.14 defconfig (present in Sony's 4.4 config).
++CONFIG_SENSORS_TCS3490=y
+ CONFIG_MSM_VIDC_3X_V4L2=y
+ CONFIG_MSM_VIDC_3X_VMEM=y
+ CONFIG_MSM_VIDC_3X_GOVERNORS=y
+@@ -623,6 +626,15 @@ CONFIG_ANDROID_LOW_MEMORY_KILLER=y
+ CONFIG_ANDROID_LOW_MEMORY_KILLER_TNG=y
+ CONFIG_ANDROID_LOW_MEMORY_KILLER_STATS=y
+ CONFIG_ION=y
++# lilac 10.142: 4.14 split the ION heaps into their own configs and this
++# defconfig kept only CONFIG_ION. Without a heap type compiled in,
++# msm_ion_of parses the DT heaps and can create none, so ION_IOC_ALLOC
++# fails EINVAL and gralloc returns NULL buffer handles. 4.4 got these via
++# CONFIG_ION_MSM=y, which no longer exists.
++CONFIG_ION_SYSTEM_HEAP=y
++CONFIG_ION_CARVEOUT_HEAP=y
++CONFIG_ION_CHUNK_HEAP=y
++CONFIG_ION_CMA_HEAP=y
+ CONFIG_QCA_CLD_WLAN=y
+ CONFIG_QCACLD_WLAN_LFR3=y
+ CONFIG_WLAN_FEATURE_11W=y
+@@ -666,9 +678,9 @@ CONFIG_QCOM_APCS_IPC=y
+ CONFIG_IOMMU_IO_PGTABLE_FAST=y
+ CONFIG_ARM_SMMU=y
+ CONFIG_QCOM_LAZY_MAPPING=y
+-CONFIG_IOMMU_DEBUG=y
+-CONFIG_IOMMU_DEBUG_TRACKING=y
+-CONFIG_IOMMU_TESTS=y
++# CONFIG_IOMMU_DEBUG is not set
++# CONFIG_IOMMU_DEBUG_TRACKING is not set
++# CONFIG_IOMMU_TESTS is not set
+ CONFIG_REMOTEPROC=y
+ CONFIG_RPMSG_CHAR=y
+ CONFIG_RPMSG_QCOM_GLINK_RPM=y
+@@ -887,3 +899,36 @@ CONFIG_SND_SOC_MSM_SDW=y
+ CONFIG_SND_SOC_MSM_HDMI_CODEC_RX=y
+ CONFIG_SND_SOC_WCD_CPE_SOMC_EXT=y
+ CONFIG_SND_SOC_MSM8998=y
++
++# --- Sailfish OS / hybris requirements,md sec.5 ---
++# hybris-boot check_kernel_config
++CONFIG_SYSVIPC=y
++CONFIG_DEVTMPFS=y
++CONFIG_DEVTMPFS_MOUNT=y
++CONFIG_AUTOFS4_FS=y
++# CONFIG_DUMMY is not set
++# NB: CONFIG_VT stays off -- the init-script drops it from the mandatory list.
++
++# systemd
++CONFIG_FHANDLE=y
++CONFIG_UTS_NS=y
++CONFIG_IPC_NS=y
++CONFIG_BLK_CGROUP=y
++
++# sailjail/firejail: without these clone() returns EINVAL and nothing sandboxed starts
++CONFIG_PID_NS=y
++CONFIG_USER_NS=y
++
++# bluebinder needs /dev/vhci
++CONFIG_BT_HCIVHCI=y
++
++# USB networking to the host
++CONFIG_USB_CONFIGFS_ECM=y
++CONFIG_INPUT_STMVL53L0=y
++CONFIG_PM_AUTOSLEEP=y
++CONFIG_BT_RFCOMM=y
++CONFIG_BT_RFCOMM_TTY=y
++CONFIG_BT_BNEP=y
++CONFIG_BT_BNEP_MC_FILTER=y
++CONFIG_BT_BNEP_PROTO_FILTER=y
++CONFIG_BT_HIDP=y
+diff --git a/arch/arm64/kernel/vdso/Makefile b/arch/arm64/kernel/vdso/Makefile
+index 89df44e87ab0..94c6427624be 100644
+--- a/arch/arm64/kernel/vdso/Makefile
++++ b/arch/arm64/kernel/vdso/Makefile
+@@ -16,13 +16,14 @@ obj-vdso-c := $(addprefix $(obj)/, $(obj-vdso-c))
+ obj-vdso   := $(obj-vdso-c) $(obj-vdso-s)
+ 
+ ccflags-y := -shared -fno-common -fno-builtin -fno-stack-protector -ffixed-x18
++ccflags-y += -B$(HOME)/lilac-v2/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9/bin
+ ccflags-y += -DDISABLE_BRANCH_PROFILING
+ ccflags-y += -nostdlib -Wl,-soname=linux-vdso.so.1 -Wl,--hash-style=sysv
+ ccflags-y += $(DISABLE_LTO) $(DISABLE_SCS)
+ 
+ # Force -O2 to avoid libgcc dependencies
+ CFLAGS_REMOVE_vgettimeofday.o = -pg -Os
+-CFLAGS_vgettimeofday.o = -O2 -fPIC
++CFLAGS_vgettimeofday.o = -O2 -fPIC -fintegrated-as
+ ifneq ($(cc-name),clang)
+ CFLAGS_vgettimeofday.o += -mcmodel=tiny
+ endif
+diff --git a/drivers/clk/qcom/gcc-msm8998.c b/drivers/clk/qcom/gcc-msm8998.c
+index 9a4bf3c18d8f..db8281820930 100644
+--- a/drivers/clk/qcom/gcc-msm8998.c
++++ b/drivers/clk/qcom/gcc-msm8998.c
+@@ -2676,7 +2676,7 @@ static struct clk_branch gcc_usb_phy_cfg_ahb2phy_clk = {
+ 
+ static struct clk_branch gcc_mss_cfg_ahb_clk = {
+ 	.halt_reg = 0x8A000,
+-	.halt_check = BRANCH_HALT,
++	.halt_check = BRANCH_HALT_SKIP, /* lilac-v2: skip halt poll -- modem off during PIL MBA load */
+ 	.hwcg_reg = 0x8a000,
+ 	.hwcg_bit = 1,
+ 	.clkr = {
+@@ -2691,6 +2691,7 @@ static struct clk_branch gcc_mss_cfg_ahb_clk = {
+ 
+ static struct clk_branch gcc_mss_q6_bimc_axi_clk = {
+ 	.halt_reg = 0x8A040,
++	.halt_check = BRANCH_HALT_SKIP, /* lilac: skip halt poll -- modem off at GCC probe, was aborting the whole controller */
+ 	.clkr = {
+ 		.enable_reg = 0x8A040,
+ 		.enable_mask = BIT(0),
+diff --git a/drivers/gpu/drm/drm_atomic.c b/drivers/gpu/drm/drm_atomic.c
+index a87ead3c5c20..4c0f58f83f60 100644
+--- a/drivers/gpu/drm/drm_atomic.c
++++ b/drivers/gpu/drm/drm_atomic.c
+@@ -764,6 +764,20 @@ static int drm_atomic_plane_set_property(struct drm_plane *plane,
+ 	} else if (property == config->prop_src_h) {
+ 		state->src_h = val;
+ 	} else if (property == plane->rotation_property) {
++		/*
++		 * lilac 10.148: msm8998's Android 9 SDM sends rotation=0 to
++		 * mean "no rotation". The ABI spells that DRM_MODE_ROTATE_0
++		 * (== 1) and wants exactly one rotate bit, so is_power_of_2(0)
++		 * refuses it and the whole atomic commit fails EINVAL -- which
++		 * is why the display was never programmed at all.
++		 *
++		 * 4.4, which these blobs were built against, had no check here
++		 * and simply stored the value, so the distinction was never
++		 * forced on them. Read "no bits" as ROTATE_0, which is what the
++		 * caller means; ambiguous multi-bit values are still refused.
++		 */
++		if (!(val & DRM_MODE_ROTATE_MASK))
++			val |= DRM_MODE_ROTATE_0;
+ 		if (!is_power_of_2(val & DRM_MODE_ROTATE_MASK))
+ 			return -EINVAL;
+ 		state->rotation = val;
+@@ -2321,6 +2335,18 @@ int drm_mode_atomic_ioctl(struct drm_device *dev,
+ 			ret = drm_atomic_set_property(state, obj, prop,
+ 						      prop_value);
+ 			if (ret) {
++				/*
++				 * lilac-v2 41: this is the only EINVAL in this
++				 * loop and the kernel otherwise says nothing,
++				 * which is why the DRM connector never going
++				 * active has been opaque.
++				 * Ratelimited: userspace retries
++				 * the commit repeatedly.
++				 */
++				DRM_ERROR_RATELIMITED(
++					"lilac-v2: atomic set_property failed: obj %u type 0x%x prop %u \"%s\" value 0x%llx -> %d\n",
++					obj->id, obj->type, prop->base.id,
++					prop->name, prop_value, ret);
+ 				drm_mode_object_put(obj);
+ 				goto out;
+ 			}
+diff --git a/drivers/media/platform/msm/camera_v2/sensor/flash/msm_flash.c b/drivers/media/platform/msm/camera_v2/sensor/flash/msm_flash.c
+index 703df3e6ed1d..16dae115c378 100644
+--- a/drivers/media/platform/msm/camera_v2/sensor/flash/msm_flash.c
++++ b/drivers/media/platform/msm/camera_v2/sensor/flash/msm_flash.c
+@@ -747,6 +747,18 @@ static int32_t msm_flash_prepare(
+ 	return ret;
+ }
+ 
++/* lilac: the flash LED is wired across both strings and faults if only one carries
++ * current; the generic HAL fills flash_current[0] only (the other slots are 0 or garbage).
++ * Use string 0's request for every string. */
++static void msm_flash_mirror_first_string(int32_t *flash_current,
++	uint32_t num_sources)
++{
++	uint32_t i;
++
++	for (i = 1; i < num_sources && i < MAX_LED_TRIGGERS; i++)
++		flash_current[i] = flash_current[0];
++}
++
+ static int32_t msm_flash_low(
+ 	struct msm_flash_ctrl_t *flash_ctrl,
+ 	struct msm_flash_cfg_data_t *flash_data)
+@@ -755,6 +767,8 @@ static int32_t msm_flash_low(
+ 	int32_t i = 0;
+ 
+ 	CDBG("Enter\n");
++	msm_flash_mirror_first_string(flash_data->flash_current,
++		flash_ctrl->torch_num_sources);
+ 	/* Turn off flash triggers */
+ 	for (i = 0; i < flash_ctrl->flash_num_sources; i++)
+ 		if (flash_ctrl->flash_trigger[i])
+@@ -792,6 +806,8 @@ static int32_t msm_flash_high(
+ 	int32_t max_current = 0;
+ 	int32_t i = 0;
+ 
++	msm_flash_mirror_first_string(flash_data->flash_current,
++		flash_ctrl->flash_num_sources);
+ 	/* Turn off torch triggers */
+ 	for (i = 0; i < flash_ctrl->torch_num_sources; i++)
+ 		if (flash_ctrl->torch_trigger[i])
+diff --git a/drivers/misc/tcs3490.c b/drivers/misc/tcs3490.c
+index ccb2f0f66d4e..e0232554502d 100644
+--- a/drivers/misc/tcs3490.c
++++ b/drivers/misc/tcs3490.c
+@@ -601,7 +601,7 @@ static void tcs3490_get_als_setup_next(struct tcs3490_chip *chip)
+ 			mutex_unlock(&chip->lock);
+ 		}
+ 		cur_ktime = ktime_get();
+-		chip->als_inf.timestamp = (uint64_t)cur_ktime.tv64;
++		chip->als_inf.timestamp = (uint64_t)cur_ktime;
+ 		dev_dbg(&chip->client->dev,
+ 			"%s: Changed channel from RGBC-IR to 0x%x Time %llu\n",
+ 			__func__, chip->als_channel, chip->als_inf.timestamp);
+@@ -626,7 +626,7 @@ static void tcs3490_get_als_setup_next(struct tcs3490_chip *chip)
+ 			le16_to_cpup((const __le16 *)&buf[6]);
+ 		mutex_unlock(&chip->lock);
+ 		cur_ktime = ktime_get();
+-		chip->als_inf.timestamp = (uint64_t)cur_ktime.tv64;
++		chip->als_inf.timestamp = (uint64_t)cur_ktime;
+ 	}
+ 
+ 	sat = min_t(u32, MAX_ALS_VALUE,
+diff --git a/drivers/power/supply/qcom/qpnp-fg-gen3.c b/drivers/power/supply/qcom/qpnp-fg-gen3.c
+index afe0c8ed0bf8..039c1d4783c4 100644
+--- a/drivers/power/supply/qcom/qpnp-fg-gen3.c
++++ b/drivers/power/supply/qcom/qpnp-fg-gen3.c
+@@ -3925,6 +3925,17 @@ static int fg_psy_get_property(struct power_supply *psy,
+ 	switch (psp) {
+ 	case POWER_SUPPLY_PROP_CAPACITY:
+ 		rc = fg_get_prop_capacity(fg, &pval->intval);
++		/* lilac: spurious capacity 0 / failed read (flaky FG SRAM access) must not look like
++		 * an empty battery to mce/DSME; keep the last known value while the voltage is healthy. */
++		if (fg->last_soc > 0 && (rc < 0 || pval->intval == 0)) {
++			int vbatt_uv;
++
++			if (rc < 0 || (!fg_get_battery_voltage(fg, &vbatt_uv) &&
++				vbatt_uv > (chip->dt.cutoff_volt_mv + 250) * 1000)) {
++				pval->intval = fg->last_soc;
++				rc = 0;
++			}
++		}
+ 		break;
+ 	case POWER_SUPPLY_PROP_CAPACITY_RAW:
+ 		rc = fg_get_msoc_raw(fg, &pval->intval);
+diff --git a/drivers/scsi/ufs/ufshcd.c b/drivers/scsi/ufs/ufshcd.c
+index fad486ec425a..a39f8e279db1 100644
+--- a/drivers/scsi/ufs/ufshcd.c
++++ b/drivers/scsi/ufs/ufshcd.c
+@@ -254,6 +254,10 @@ static void ufshcd_update_uic_error_cnt(struct ufs_hba *hba, u32 reg, int type)
+ /* default value of ref clock gating wait time is 100 micro seconds */
+ #define UFSHCD_REF_CLK_GATING_WAIT_US 100 /* microsecs */
+ 
++/* lilac 171: attempts at UFS device detection (deferred) before giving up */
++#define UFSHCD_LILAC_DETECT_RETRIES 3
++#define UFSHCD_LILAC_DETECT_DELAY_SECS 3
++
+ #define UFSHCD_CLK_GATING_DELAY_MS_PWR_SAVE	10
+ #define UFSHCD_CLK_GATING_DELAY_MS_PERF		50
+ 
+@@ -9133,6 +9137,36 @@ static int ufshcd_extcon_unregister(struct ufs_hba *hba)
+ 	return ret;
+ }
+ 
++/*
++ * lilac 171: deferred device-detection retry. See patches/patch-ufs-retry-device-detect-
++ * deferred-414.py for the reasoning (immediate retry crashed the phone, 3 s later works).
++ */
++static struct ufs_hba *lilac_detect_hba;
++static void lilac_detect_retry_fn(struct work_struct *w);
++static DECLARE_DELAYED_WORK(lilac_detect_retry_work, lilac_detect_retry_fn);
++
++static void lilac_detect_retry_fn(struct work_struct *w)
++{
++	struct ufs_hba *hba = lilac_detect_hba;
++	int i, err = -EIO;
++
++	for (i = 1; err && i <= UFSHCD_LILAC_DETECT_RETRIES; i++) {
++		dev_err(hba->dev, "%s: retry %d/%d with full device reset\n",
++			__func__, i, UFSHCD_LILAC_DETECT_RETRIES);
++		ufshcd_hold_all(hba);
++		/* ufshcd_probe_hba() drops one runtime-PM reference on every exit here */
++		pm_runtime_get_sync(hba->dev);
++		err = ufshcd_detect_device(hba);
++		ufshcd_release_all(hba);
++	}
++	if (err)
++		dev_err(hba->dev, "%s: device detection failed after %d retries (%d)\n",
++			__func__, UFSHCD_LILAC_DETECT_RETRIES, err);
++	else
++		dev_err(hba->dev, "%s: device detected after %d retry(ies)\n",
++			__func__, i - 1);
++}
++
+ /**
+  * ufshcd_async_scan - asynchronous execution for probing hba
+  * @data: data pointer to pass to this function
+@@ -9141,13 +9175,22 @@ static int ufshcd_extcon_unregister(struct ufs_hba *hba)
+ static void ufshcd_async_scan(void *data, async_cookie_t cookie)
+ {
+ 	struct ufs_hba *hba = (struct ufs_hba *)data;
++	int ret;
+ 
+ 	/*
+ 	 * Don't allow clock gating and hibern8 enter for faster device
+ 	 * detection.
+ 	 */
+ 	ufshcd_hold_all(hba);
+-	ufshcd_probe_hba(hba);
++	ret = ufshcd_probe_hba(hba);
++	if (ret) {
++		dev_err(hba->dev,
++			"%s: device detection failed (%d), retry in %d s\n",
++			__func__, ret, UFSHCD_LILAC_DETECT_DELAY_SECS);
++		lilac_detect_hba = hba;
++		schedule_delayed_work(&lilac_detect_retry_work,
++				      UFSHCD_LILAC_DETECT_DELAY_SECS * HZ);
++	}
+ 	ufshcd_release_all(hba);
+ 
+ 	ufshcd_extcon_register(hba);
+@@ -11194,6 +11237,16 @@ int ufshcd_init(struct ufs_hba *hba, void __iomem *mmio_base, unsigned int irq)
+ 	/* Enable debug prints */
+ 	hba->ufshcd_dbg_print = DEFAULT_UFSHCD_DBG_PRINT_EN;
+ 
++	/*
++	 * lilac 10.129: seed the ref-clk gating wait before anything can gate the
++	 * device reference clock. It is otherwise 0 until
++	 * ufshcd_get_dev_ref_clk_gating_wait() runs, which is only after the device
++	 * descriptor has been read -- so the early gates take udelay(0) where 4.4
++	 * always took udelay(1), and the device can stop answering UPIU queries.
++	 * Overwritten with the device's own value as soon as it can be read.
++	 */
++	hba->dev_ref_clk_gating_wait = UFSHCD_REF_CLK_GATING_WAIT_US;
++
+ 	err = ufshcd_set_dma_mask(hba);
+ 	if (err) {
+ 		dev_err(hba->dev, "set dma mask failed\n");
+diff --git a/drivers/soc/qcom/pil-msa.c b/drivers/soc/qcom/pil-msa.c
+index daecbc464108..6ee3b46d5113 100644
+--- a/drivers/soc/qcom/pil-msa.c
++++ b/drivers/soc/qcom/pil-msa.c
+@@ -567,6 +567,17 @@ static int pil_mss_reset(struct pil_desc *pil)
+ 	if (ret)
+ 		goto err_power;
+ 
++	/*
++	 * lilac-v2: deassert the MSS reset BEFORE enabling clocks, matching the
++	 * working 4.4 kernel. The MSS<->NoC AXI bridge clocks (gcc_mss_snoc_axi_clk,
++	 * gcc_mss_mnoc_bimc_axi_clk) cannot complete their halt handshake while the
++	 * MSS is held in reset, so enabling them first leaves them stuck at 'off'
++	 * forever and fails the MBA load with -EBUSY.
++	 */
++	ret = pil_mss_restart_reg(drv, 0);
++	if (ret)
++		goto err_clks;
++
+ 	ret = pil_mss_enable_clks(drv);
+ 	if (ret)
+ 		goto err_clks;
+@@ -576,13 +587,12 @@ static int pil_mss_reset(struct pil_desc *pil)
+ 		debug_val = readl_relaxed(drv->reg_base + QDSP6SS_DBG_CFG);
+ 	}
+ 
+-	/* Assert reset to subsystem */
+-	pil_mss_assert_resets(drv);
+-	/* Wait 6 32kHz sleep cycles for reset */
+-	udelay(200);
+-	ret = pil_mss_deassert_resets(drv);
+-	if (ret)
+-		goto err_restart;
++	/*
++	 * lilac-v2: 4.4 does no assert/deassert cycle here -- the reset was already
++	 * deasserted above, before the clocks. The 4.14 cycle exists for
++	 * PDC-sync/alt-reset capable SoCs; msm8998's DT declares neither, so it is
++	 * a no-op here apart from re-imposing the broken ordering.
++	 */
+ 
+ 	if (!pil->minidump_ss || !pil->modem_ssr) {
+ 		writel_relaxed(debug_val, drv->reg_base + QDSP6SS_DBG_CFG);
+@@ -635,11 +645,12 @@ static int pil_mss_reset(struct pil_desc *pil)
+ 
+ err_q6v5_reset:
+ 	modem_log_rmb_regs(drv->rmb_base);
+-err_restart:
+ 	pil_mss_disable_clks(drv);
+ 	if (drv->ahb_clk_vote)
+ 		clk_disable_unprepare(drv->ahb_clk);
+ err_clks:
++	/* lilac-v2: re-assert the reset we deasserted above, as 4.4 does */
++	pil_mss_restart_reg(drv, 1);
+ 	pil_mss_power_down(drv);
+ err_power:
+ 	return ret;
+diff --git a/drivers/staging/android/ion/Makefile b/drivers/staging/android/ion/Makefile
+index dc638f080d7f..e13b5457c817 100644
+--- a/drivers/staging/android/ion/Makefile
++++ b/drivers/staging/android/ion/Makefile
+@@ -1,5 +1,5 @@
+ # SPDX-License-Identifier: GPL-2.0
+-obj-$(CONFIG_ION) +=	ion.o ion-ioctl.o ion_heap.o \
++obj-$(CONFIG_ION) +=	ion.o ion-ioctl.o ion_heap.o ion_legacy.o \
+ 			ion_page_pool.o ion_system_heap.o \
+ 			ion_carveout_heap.o ion_chunk_heap.o \
+ 			ion_system_secure_heap.o ion_cma_heap.o \
+diff --git a/drivers/staging/android/ion/ion-ioctl.c b/drivers/staging/android/ion/ion-ioctl.c
+index 83cbcc0dcd8c..1e4772970488 100644
+--- a/drivers/staging/android/ion/ion-ioctl.c
++++ b/drivers/staging/android/ion/ion-ioctl.c
+@@ -19,6 +19,7 @@
+ #include <linux/uaccess.h>
+ 
+ #include "ion.h"
++#include "ion_legacy.h"
+ #include "ion_system_secure_heap.h"
+ 
+ union ion_ioctl_arg {
+@@ -59,6 +60,17 @@ long ion_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
+ 	unsigned int dir;
+ 	union ion_ioctl_arg data;
+ 
++	/*
++	 * The pre-4.12 ABI, which the msm8998 vendor blobs still speak. This
++	 * MUST be tested before the size guard below: the legacy ALLOC carries a
++	 * 32-byte struct against this union's 24, so the guard is exactly what
++	 * turns it into -EINVAL today. The smaller legacy commands would instead
++	 * fall out of the switch as -ENOTTY. Either way they never reach their
++	 * implementation without this.
++	 */
++	if (ion_legacy_is_legacy_cmd(cmd))
++		return ion_legacy_ioctl(filp, cmd, arg);
++
+ 	dir = ion_ioctl_dir(cmd);
+ 
+ 	if (_IOC_SIZE(cmd) > sizeof(data))
+diff --git a/drivers/staging/android/ion/ion.c b/drivers/staging/android/ion/ion.c
+index bac021c2c331..af5ab1be27bb 100644
+--- a/drivers/staging/android/ion/ion.c
++++ b/drivers/staging/android/ion/ion.c
+@@ -45,6 +45,7 @@
+ #include <soc/qcom/secure_buffer.h>
+ 
+ #include "ion.h"
++#include "ion_legacy.h"
+ #include "ion_secure_util.h"
+ 
+ static struct ion_device *internal_dev;
+@@ -1199,6 +1200,13 @@ int ion_query_heaps(struct ion_heap_query *query)
+ 
+ static const struct file_operations ion_fops = {
+ 	.owner          = THIS_MODULE,
++	/*
++	 * The legacy ABI scopes its handles to the open file, so every open of
++	 * /dev/ion needs a table. 4.14 had neither hook and left private_data
++	 * unused, so nothing here displaces existing behaviour.
++	 */
++	.open           = ion_legacy_open,
++	.release        = ion_legacy_release,
+ 	.unlocked_ioctl = ion_ioctl,
+ #ifdef CONFIG_COMPAT
+ 	.compat_ioctl	= ion_ioctl,
+diff --git a/drivers/staging/android/ion/ion.h b/drivers/staging/android/ion/ion.h
+index 18a9b9b08315..c3988f688997 100644
+--- a/drivers/staging/android/ion/ion.h
++++ b/drivers/staging/android/ion/ion.h
+@@ -301,6 +301,16 @@ int ion_heap_pages_zero(struct page *page, size_t size, pgprot_t pgprot);
+ 
+ int ion_alloc_fd(size_t len, unsigned int heap_id_mask, unsigned int flags);
+ 
++/*
++ * Defined in ion.c and used by ion_alloc_fd(), but never declared in a header.
++ * The legacy ABI needs the dma_buf itself rather than an fd, and this is the
++ * same entry point the modern allocation takes -- unlike ion_alloc(), which
++ * rejects every heap type but SYSTEM/HYP_CMA/SYSTEM_SECURE.
++ */
++struct dma_buf;
++struct dma_buf *ion_alloc_dmabuf(size_t len, unsigned int heap_id_mask,
++				 unsigned int flags);
++
+ /**
+  * ion_heap_init_shrinker
+  * @heap:		the heap
+diff --git a/net/bluetooth/hci_event.c b/net/bluetooth/hci_event.c
+index eca596a56f46..bbd7fff6dc90 100644
+--- a/net/bluetooth/hci_event.c
++++ b/net/bluetooth/hci_event.c
+@@ -4963,6 +4963,8 @@ static void hci_le_adv_report_evt(struct hci_dev *hdev, struct sk_buff *skb)
+ 
+ 	hci_dev_lock(hdev);
+ 
++	u8 orig_num_reports = num_reports; /* lilac-v2 diag */
++
+ 	while (num_reports--) {
+ 		struct hci_ev_le_advertising_info *ev = ptr;
+ 		s8 rssi;
+@@ -4974,13 +4976,35 @@ static void hci_le_adv_report_evt(struct hci_dev *hdev, struct sk_buff *skb)
+ 					   ev->bdaddr_type, NULL, 0, rssi,
+ 					   ev->data, ev->length);
+ 		} else {
+-			bt_dev_err(hdev, "Dropping invalid advertising data");
++			/* lilac-v2 diag */
++			bt_dev_err(hdev,
++				"Dropping invalid advertising data: bdaddr=%pMR type=%u evt_type=%u len=%u skb_len=%u remaining=%u/%u",
++				&ev->bdaddr, ev->bdaddr_type, ev->evt_type,
++				ev->length, skb->len, num_reports + 1,
++				orig_num_reports);
+ 		}
+ 
+ 		ptr += sizeof(*ev) + ev->length + 1;
+ 
+-		if (ptr > (void *) skb_tail_pointer(skb) - sizeof(*ev)) {
+-			bt_dev_err(hdev, "Malicious advertising data. Stopping processing");
++		/* lilac-v2 off-by-one fix: only
++		 * check that there's room for another report's header when
++		 * another iteration is actually coming -- num_reports==0
++		 * here means this was the last (or only) report, already
++		 * fully and correctly consumed; the while() loop's own
++		 * condition ends things cleanly on its own. Without this
++		 * guard, any single-report event that exactly fills its
++		 * buffer (ptr lands exactly at the tail, entirely valid) was
++		 * always misclassified as malicious and dropped.
++		 */
++		if (num_reports &&
++		    ptr > (void *) skb_tail_pointer(skb) - sizeof(*ev)) {
++			/* lilac-v2 diag */
++			bt_dev_err(hdev,
++				"Malicious advertising data. Stopping processing: last bdaddr=%pMR type=%u evt_type=%u len=%u skb_len=%u remaining=%u/%u offset=%ld",
++				&ev->bdaddr, ev->bdaddr_type, ev->evt_type,
++				ev->length, skb->len, num_reports + 1,
++				orig_num_reports,
++				(long)((void *)ptr - (void *)skb->data));
+ 			break;
+ 		}
+ 	}
+diff --git a/drivers/staging/android/ion/ion_legacy.c b/drivers/staging/android/ion/ion_legacy.c
+new file mode 100644
+index 000000000000..42b78be530f8
+--- /dev/null
++++ b/drivers/staging/android/ion/ion_legacy.c
+@@ -0,0 +1,473 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * The pre-4.12 ION ioctl ABI, reimplemented on top of 4.14's dma_buf-fd ION.
++ *
++ *
++ *
++ * The two ABIs differ in their object model, not just their structs. 4.4 handed
++ * userspace an opaque per-client `ion_user_handle_t` and made it ask separately
++ * for a shareable fd; 4.14 returns the dma_buf fd from the allocation itself and
++ * has no handles at all. So this is not a struct-shuffling shim: it has to
++ * re-create the handle namespace, which is what the per-open idr below is.
++ *
++ * The mapping is:
++ *
++ *     legacy handle  ->  struct dma_buf *   (one reference held by the table)
++ *
++ * ALLOC   allocate a dma_buf, park it in the table, return its handle
++ * IMPORT  dma_buf_get(fd), park it, return a handle
++ * MAP     look the handle up, hand out an fd for the same dma_buf
++ * SHARE   identical to MAP in the legacy ABI -- both just produce an fd
++ * FREE    drop the table's reference
++ * SYNC    the CPU-access bracket, which is where 4.14 put cache maintenance
++ * CUSTOM  msm's CLEAN/INV/CLEAN_INV cache ops
++ *
++ * The refcounting is the part worth being careful about, and it is commented
++ * where it happens.
++ */
++
++#include <linux/dma-buf.h>
++#include <linux/dma-direction.h>
++#include <linux/err.h>
++#include <linux/fs.h>
++#include <linux/idr.h>
++#include <linux/mutex.h>
++#include <linux/slab.h>
++#include <linux/uaccess.h>
++
++#include "ion.h"
++#include "ion_legacy.h"
++
++/**
++ * struct ion_legacy_client - the handle namespace for one open of /dev/ion
++ *
++ * The legacy ABI scoped handles to the open file, and blobs rely on that: two
++ * processes may hold the same handle value meaning different buffers. So this
++ * hangs off filp->private_data, which 4.14's ion leaves unused.
++ */
++struct ion_legacy_client {
++	struct idr handles;
++	struct mutex lock;
++};
++
++int ion_legacy_open(struct inode *inode, struct file *filp)
++{
++	struct ion_legacy_client *client;
++
++	client = kzalloc(sizeof(*client), GFP_KERNEL);
++	if (!client)
++		return -ENOMEM;
++
++	idr_init(&client->handles);
++	mutex_init(&client->lock);
++	filp->private_data = client;
++
++	return 0;
++}
++
++int ion_legacy_release(struct inode *inode, struct file *filp)
++{
++	struct ion_legacy_client *client = filp->private_data;
++	struct dma_buf *dmabuf;
++	int id;
++
++	if (!client)
++		return 0;
++
++	/*
++	 * 4.4 cleaned a client's handles up on close and callers depend on it --
++	 * gralloc, for one, leaks handles deliberately on some error paths.
++	 * Anything still in the table owns a dma_buf reference that nothing else
++	 * will ever drop, so this is not optional tidiness.
++	 */
++	mutex_lock(&client->lock);
++	idr_for_each_entry(&client->handles, dmabuf, id)
++		dma_buf_put(dmabuf);
++	idr_destroy(&client->handles);
++	mutex_unlock(&client->lock);
++
++	mutex_destroy(&client->lock);
++	kfree(client);
++	filp->private_data = NULL;
++
++	return 0;
++}
++
++static struct dma_buf *ion_legacy_lookup(struct ion_legacy_client *client,
++					 ion_user_handle_t handle)
++{
++	struct dma_buf *dmabuf;
++
++	mutex_lock(&client->lock);
++	dmabuf = idr_find(&client->handles, handle);
++	mutex_unlock(&client->lock);
++
++	return dmabuf;
++}
++
++static int ion_legacy_insert(struct ion_legacy_client *client,
++			     struct dma_buf *dmabuf)
++{
++	int id;
++
++	mutex_lock(&client->lock);
++	/* 0 is the legacy ABI's "no handle", so ids start at 1 */
++	id = idr_alloc(&client->handles, dmabuf, 1, 0, GFP_KERNEL);
++	mutex_unlock(&client->lock);
++
++	return id;
++}
++
++static int ion_legacy_drop(struct ion_legacy_client *client,
++			   ion_user_handle_t handle)
++{
++	struct dma_buf *dmabuf;
++
++	mutex_lock(&client->lock);
++	dmabuf = idr_remove(&client->handles, handle);
++	mutex_unlock(&client->lock);
++
++	if (!dmabuf)
++		return -EINVAL;
++
++	dma_buf_put(dmabuf);
++
++	return 0;
++}
++
++static int ion_legacy_do_alloc(struct ion_legacy_client *client, u64 len,
++			       u32 heap_id_mask, u32 flags,
++			       ion_user_handle_t *out_handle)
++{
++	struct dma_buf *dmabuf;
++	int id;
++
++	/*
++	 * @align is accepted and ignored. 4.12 dropped it from the ABI and no
++	 * 4.14 heap honours it; the callers here pass the page size, which the
++	 * allocator already guarantees.
++	 *
++	 * ion_alloc_dmabuf() rather than ion_alloc(): the latter rejects every
++	 * heap type except SYSTEM/HYP_CMA/SYSTEM_SECURE, and the blobs allocate
++	 * from carveout and qsecom heaps too. ion_alloc_fd() -- the new ABI's
++	 * own path -- uses ion_alloc_dmabuf, so this behaves identically to a
++	 * modern allocation.
++	 */
++	dmabuf = ion_alloc_dmabuf(len, heap_id_mask, flags);
++	if (IS_ERR(dmabuf))
++		return PTR_ERR(dmabuf);
++
++	id = ion_legacy_insert(client, dmabuf);
++	if (id < 0) {
++		dma_buf_put(dmabuf);
++		return id;
++	}
++
++	*out_handle = id;
++
++	return 0;
++}
++
++static int ion_legacy_do_share(struct ion_legacy_client *client,
++			       ion_user_handle_t handle, int *out_fd)
++{
++	struct dma_buf *dmabuf;
++	int fd;
++
++	dmabuf = ion_legacy_lookup(client, handle);
++	if (!dmabuf)
++		return -EINVAL;
++
++	/*
++	 * dma_buf_fd() CONSUMES a reference: fd_install() takes over the file
++	 * reference the caller held. Take a fresh one for the fd so the table
++	 * keeps its own -- otherwise closing the fd frees a buffer the handle
++	 * still points at, which is precisely the use-after-free that the
++	 * legacy handle model invites.
++	 */
++	get_dma_buf(dmabuf);
++
++	fd = dma_buf_fd(dmabuf, O_CLOEXEC);
++	if (fd < 0) {
++		dma_buf_put(dmabuf);
++		return fd;
++	}
++
++	*out_fd = fd;
++
++	return 0;
++}
++
++static int ion_legacy_do_import(struct ion_legacy_client *client, int fd,
++				ion_user_handle_t *out_handle)
++{
++	struct dma_buf *dmabuf;
++	int id;
++
++	/* dma_buf_get() returns a new reference, which the table then owns */
++	dmabuf = dma_buf_get(fd);
++	if (IS_ERR(dmabuf))
++		return PTR_ERR(dmabuf);
++
++	id = ion_legacy_insert(client, dmabuf);
++	if (id < 0) {
++		dma_buf_put(dmabuf);
++		return id;
++	}
++
++	*out_handle = id;
++
++	return 0;
++}
++
++/*
++ * Cache maintenance.
++ *
++ * 4.14 expresses it as a bracket -- begin_cpu_access() invalidates,
++ * end_cpu_access() cleans -- and ION's implementation tracks state across the
++ * pair. Issuing half a bracket to mimic a one-way legacy op would leave that
++ * state inconsistent, so both halves are always issued and the *direction*
++ * carries the meaning. That does marginally more work than 4.4 did for CLEAN
++ * and INV; it is never less, so it is never wrong.
++ */
++static int ion_legacy_cache_op(struct dma_buf *dmabuf, unsigned int op,
++			       u32 offset, u32 length)
++{
++	enum dma_data_direction dir;
++	bool partial = length != 0;
++	int ret;
++
++	switch (op) {
++	case ION_LEGACY_IOC_CLEAN_CACHES:
++	case ION_LEGACY_IOC_CLEAN_CACHES32:
++		dir = DMA_TO_DEVICE;
++		break;
++	case ION_LEGACY_IOC_INV_CACHES:
++	case ION_LEGACY_IOC_INV_CACHES32:
++		dir = DMA_FROM_DEVICE;
++		break;
++	case ION_LEGACY_IOC_CLEAN_INV_CACHES:
++	case ION_LEGACY_IOC_CLEAN_INV_CACHES32:
++		dir = DMA_BIDIRECTIONAL;
++		break;
++	default:
++		return -ENOTTY;
++	}
++
++	if (partial) {
++		ret = dma_buf_begin_cpu_access_partial(dmabuf, dir, offset,
++						       length);
++		if (ret)
++			return ret;
++		return dma_buf_end_cpu_access_partial(dmabuf, dir, offset,
++						      length);
++	}
++
++	ret = dma_buf_begin_cpu_access(dmabuf, dir);
++	if (ret)
++		return ret;
++
++	return dma_buf_end_cpu_access(dmabuf, dir);
++}
++
++static int ion_legacy_custom(struct ion_legacy_client *client, unsigned int op,
++			     void __user *uarg, bool compat)
++{
++	struct dma_buf *dmabuf;
++	ion_user_handle_t handle;
++	u32 offset, length;
++	bool put = false;
++	int fd, ret;
++
++	if (compat) {
++		struct ion_legacy_flush_data32 data;
++
++		if (copy_from_user(&data, uarg, sizeof(data)))
++			return -EFAULT;
++		handle = data.handle;
++		fd = data.fd;
++		offset = data.offset;
++		length = data.length;
++	} else {
++		struct ion_legacy_flush_data data;
++
++		if (copy_from_user(&data, uarg, sizeof(data)))
++			return -EFAULT;
++		handle = data.handle;
++		fd = data.fd;
++		offset = data.offset;
++		length = data.length;
++	}
++
++	/*
++	 * The payload carries both a handle and an fd, and callers set one or
++	 * the other depending on vintage. Prefer the fd: it is unambiguous, and
++	 * a buffer reached that way need not be in this client's table at all.
++	 */
++	if (fd >= 0) {
++		dmabuf = dma_buf_get(fd);
++		if (IS_ERR(dmabuf))
++			return PTR_ERR(dmabuf);
++		put = true;
++	} else {
++		dmabuf = ion_legacy_lookup(client, handle);
++		if (!dmabuf)
++			return -EINVAL;
++	}
++
++	ret = ion_legacy_cache_op(dmabuf, op, offset, length);
++
++	if (put)
++		dma_buf_put(dmabuf);
++
++	return ret;
++}
++
++static int ion_legacy_sync(int fd)
++{
++	struct dma_buf *dmabuf;
++	int ret;
++
++	dmabuf = dma_buf_get(fd);
++	if (IS_ERR(dmabuf))
++		return PTR_ERR(dmabuf);
++
++	/*
++	 * Legacy ION_IOC_SYNC meant "the CPU touched this, make it coherent for
++	 * devices". Bidirectional is the conservative reading, and matches what
++	 * 4.4's msm ion did for this ioctl.
++	 */
++	ret = dma_buf_begin_cpu_access(dmabuf, DMA_BIDIRECTIONAL);
++	if (!ret)
++		ret = dma_buf_end_cpu_access(dmabuf, DMA_BIDIRECTIONAL);
++
++	dma_buf_put(dmabuf);
++
++	return ret;
++}
++
++long ion_legacy_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
++{
++	struct ion_legacy_client *client = filp->private_data;
++	void __user *uarg = (void __user *)arg;
++	int ret;
++
++	if (!client)
++		return -EINVAL;
++
++	switch (cmd) {
++	case ION_LEGACY_IOC_ALLOC: {
++		struct ion_legacy_allocation_data data;
++
++		if (copy_from_user(&data, uarg, sizeof(data)))
++			return -EFAULT;
++
++		ret = ion_legacy_do_alloc(client, data.len, data.heap_id_mask,
++					  data.flags, &data.handle);
++		if (ret)
++			return ret;
++
++		if (copy_to_user(uarg, &data, sizeof(data))) {
++			ion_legacy_drop(client, data.handle);
++			return -EFAULT;
++		}
++
++		return 0;
++	}
++	case ION_LEGACY_IOC_ALLOC32: {
++		struct ion_legacy_allocation_data32 data;
++
++		if (copy_from_user(&data, uarg, sizeof(data)))
++			return -EFAULT;
++
++		ret = ion_legacy_do_alloc(client, data.len, data.heap_id_mask,
++					  data.flags, &data.handle);
++		if (ret)
++			return ret;
++
++		if (copy_to_user(uarg, &data, sizeof(data))) {
++			ion_legacy_drop(client, data.handle);
++			return -EFAULT;
++		}
++
++		return 0;
++	}
++	case ION_LEGACY_IOC_FREE: {
++		struct ion_legacy_handle_data data;
++
++		if (copy_from_user(&data, uarg, sizeof(data)))
++			return -EFAULT;
++
++		return ion_legacy_drop(client, data.handle);
++	}
++	case ION_LEGACY_IOC_MAP:
++	case ION_LEGACY_IOC_SHARE: {
++		struct ion_legacy_fd_data data;
++
++		if (copy_from_user(&data, uarg, sizeof(data)))
++			return -EFAULT;
++
++		ret = ion_legacy_do_share(client, data.handle, &data.fd);
++		if (ret)
++			return ret;
++
++		if (copy_to_user(uarg, &data, sizeof(data))) {
++			/*
++			 * The fd is already installed in the caller's table and
++			 * cannot be recalled from here; it will go when the
++			 * process does. Nothing leaks in the kernel.
++			 */
++			return -EFAULT;
++		}
++
++		return 0;
++	}
++	case ION_LEGACY_IOC_IMPORT: {
++		struct ion_legacy_fd_data data;
++
++		if (copy_from_user(&data, uarg, sizeof(data)))
++			return -EFAULT;
++
++		ret = ion_legacy_do_import(client, data.fd, &data.handle);
++		if (ret)
++			return ret;
++
++		if (copy_to_user(uarg, &data, sizeof(data))) {
++			ion_legacy_drop(client, data.handle);
++			return -EFAULT;
++		}
++
++		return 0;
++	}
++	case ION_LEGACY_IOC_SYNC: {
++		struct ion_legacy_fd_data data;
++
++		if (copy_from_user(&data, uarg, sizeof(data)))
++			return -EFAULT;
++
++		return ion_legacy_sync(data.fd);
++	}
++	case ION_LEGACY_IOC_CUSTOM: {
++		struct ion_legacy_custom_data data;
++
++		if (copy_from_user(&data, uarg, sizeof(data)))
++			return -EFAULT;
++
++		return ion_legacy_custom(client, data.cmd,
++					 (void __user *)(uintptr_t)data.arg,
++					 false);
++	}
++	case ION_LEGACY_IOC_CUSTOM32: {
++		struct ion_legacy_custom_data32 data;
++
++		if (copy_from_user(&data, uarg, sizeof(data)))
++			return -EFAULT;
++
++		return ion_legacy_custom(client, data.cmd,
++					 (void __user *)(uintptr_t)data.arg,
++					 true);
++	}
++	default:
++		return -ENOTTY;
++	}
++}
+diff --git a/drivers/staging/android/ion/ion_legacy.h b/drivers/staging/android/ion/ion_legacy.h
+new file mode 100644
+index 000000000000..cfe6ff8d8163
+--- /dev/null
++++ b/drivers/staging/android/ion/ion_legacy.h
+@@ -0,0 +1,166 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++/*
++ * The pre-4.12 ("legacy") ION ioctl ABI, for vendor blobs compiled against it.
++ *
++ * msm8998's Android 9 blobs -- gralloc, camera, video,
++ * audio, everything that allocates -- speak the ION ABI that 4.4 had. 4.14
++ * replaced it wholesale: allocation now returns a dma_buf fd directly, and the
++ * opaque per-client `ion_user_handle_t` and its ioctls are gone.
++ *
++ * _IOWR() encodes sizeof(struct) into the command number, so the two ABIs do
++ * not merely differ in behaviour, they produce *different ioctl numbers*, and
++ * 4.14's dispatcher rejects the old ones before it even looks at the command:
++ *
++ *     ioctl(5, _IOC(_IOC_READ|_IOC_WRITE, 0x49, 0, 0x20), ...) = -1 EINVAL
++ *
++ * because `_IOC_SIZE(cmd) > sizeof(union ion_ioctl_arg)` is 32 > 24.
++ *
++ * The structs below are therefore spelled with fixed-width types chosen to
++ * reproduce the 4.4 layouts exactly, not to be pretty:
++ *
++ *   4.4:  struct ion_allocation_data { size_t len; size_t align;
++ *                                      unsigned int heap_id_mask;
++ *                                      unsigned int flags;
++ *                                      ion_user_handle_t handle; };
++ *
++ * On LP64 that is 8+8+4+4+4 padded to 32; on ILP32 it is 20. A 32-bit caller
++ * therefore issues a *different* command for the same operation, which is why
++ * the 32-bit variants below exist rather than being folded in. (`compat_ioctl`
++ * points at the same dispatcher, so both arrive here.)
++ */
++#ifndef _ION_LEGACY_H
++#define _ION_LEGACY_H
++
++#include <linux/fs.h>
++#include <linux/types.h>
++
++typedef int ion_user_handle_t;
++
++struct ion_legacy_allocation_data {
++	__u64 len;
++	__u64 align;
++	__u32 heap_id_mask;
++	__u32 flags;
++	ion_user_handle_t handle;
++};
++
++struct ion_legacy_allocation_data32 {
++	__u32 len;
++	__u32 align;
++	__u32 heap_id_mask;
++	__u32 flags;
++	ion_user_handle_t handle;
++};
++
++struct ion_legacy_handle_data {
++	ion_user_handle_t handle;
++};
++
++struct ion_legacy_fd_data {
++	ion_user_handle_t handle;
++	int fd;
++};
++
++struct ion_legacy_custom_data {
++	__u32 cmd;
++	__aligned_u64 arg;
++};
++
++struct ion_legacy_custom_data32 {
++	__u32 cmd;
++	__u32 arg;
++};
++
++/* msm cache-maintenance payload, reached through ION_IOC_CUSTOM */
++struct ion_legacy_flush_data {
++	ion_user_handle_t handle;
++	int fd;
++	__aligned_u64 vaddr;
++	__u32 offset;
++	__u32 length;
++};
++
++struct ion_legacy_flush_data32 {
++	ion_user_handle_t handle;
++	int fd;
++	__u32 vaddr;
++	__u32 offset;
++	__u32 length;
++};
++
++#define ION_LEGACY_IOC_MAGIC		'I'
++#define ION_LEGACY_IOC_MSM_MAGIC	'M'
++
++/*
++ * nr 0 collides with 4.14's ION_IOC_ALLOC *by number only* -- the sizes differ
++ * (32/20 vs 24), so the full commands are distinct. 4.14 uses nr 8 for
++ * HEAP_QUERY and 'M' nr 3/4 for PREFETCH/DRAIN; nrs 1,2,4,5,6,7 are unused
++ * there, so nothing below can shadow a live command.
++ */
++#define ION_LEGACY_IOC_ALLOC \
++	_IOWR(ION_LEGACY_IOC_MAGIC, 0, struct ion_legacy_allocation_data)
++#define ION_LEGACY_IOC_ALLOC32 \
++	_IOWR(ION_LEGACY_IOC_MAGIC, 0, struct ion_legacy_allocation_data32)
++#define ION_LEGACY_IOC_FREE \
++	_IOWR(ION_LEGACY_IOC_MAGIC, 1, struct ion_legacy_handle_data)
++#define ION_LEGACY_IOC_MAP \
++	_IOWR(ION_LEGACY_IOC_MAGIC, 2, struct ion_legacy_fd_data)
++#define ION_LEGACY_IOC_SHARE \
++	_IOWR(ION_LEGACY_IOC_MAGIC, 4, struct ion_legacy_fd_data)
++#define ION_LEGACY_IOC_IMPORT \
++	_IOWR(ION_LEGACY_IOC_MAGIC, 5, struct ion_legacy_fd_data)
++#define ION_LEGACY_IOC_CUSTOM \
++	_IOWR(ION_LEGACY_IOC_MAGIC, 6, struct ion_legacy_custom_data)
++#define ION_LEGACY_IOC_CUSTOM32 \
++	_IOWR(ION_LEGACY_IOC_MAGIC, 6, struct ion_legacy_custom_data32)
++#define ION_LEGACY_IOC_SYNC \
++	_IOWR(ION_LEGACY_IOC_MAGIC, 7, struct ion_legacy_fd_data)
++
++/* ION_IOC_CUSTOM sub-commands */
++#define ION_LEGACY_IOC_CLEAN_CACHES \
++	_IOWR(ION_LEGACY_IOC_MSM_MAGIC, 0, struct ion_legacy_flush_data)
++#define ION_LEGACY_IOC_INV_CACHES \
++	_IOWR(ION_LEGACY_IOC_MSM_MAGIC, 1, struct ion_legacy_flush_data)
++#define ION_LEGACY_IOC_CLEAN_INV_CACHES \
++	_IOWR(ION_LEGACY_IOC_MSM_MAGIC, 2, struct ion_legacy_flush_data)
++#define ION_LEGACY_IOC_CLEAN_CACHES32 \
++	_IOWR(ION_LEGACY_IOC_MSM_MAGIC, 0, struct ion_legacy_flush_data32)
++#define ION_LEGACY_IOC_INV_CACHES32 \
++	_IOWR(ION_LEGACY_IOC_MSM_MAGIC, 1, struct ion_legacy_flush_data32)
++#define ION_LEGACY_IOC_CLEAN_INV_CACHES32 \
++	_IOWR(ION_LEGACY_IOC_MSM_MAGIC, 2, struct ion_legacy_flush_data32)
++
++/**
++ * ion_legacy_is_legacy_cmd - does this command belong to the pre-4.12 ABI?
++ *
++ * Must be consulted by ion_ioctl() *before* its `_IOC_SIZE(cmd) > sizeof(data)`
++ * guard, which is what currently turns the blobs' ALLOC into -EINVAL. The
++ * smaller legacy commands would otherwise reach the switch and fall out of it
++ * as -ENOTTY, so every one of them has to be claimed here.
++ */
++static inline bool ion_legacy_is_legacy_cmd(unsigned int cmd)
++{
++	if (_IOC_TYPE(cmd) != ION_LEGACY_IOC_MAGIC)
++		return false;
++
++	switch (cmd) {
++	case ION_LEGACY_IOC_ALLOC:
++	case ION_LEGACY_IOC_ALLOC32:
++	case ION_LEGACY_IOC_FREE:
++	case ION_LEGACY_IOC_MAP:
++	case ION_LEGACY_IOC_SHARE:
++	case ION_LEGACY_IOC_IMPORT:
++	case ION_LEGACY_IOC_SYNC:
++	case ION_LEGACY_IOC_CUSTOM:
++	case ION_LEGACY_IOC_CUSTOM32:
++		return true;
++	default:
++		return false;
++	}
++}
++
++long ion_legacy_ioctl(struct file *filp, unsigned int cmd, unsigned long arg);
++int ion_legacy_open(struct inode *inode, struct file *filp);
++int ion_legacy_release(struct inode *inode, struct file *filp);
++
++#endif /* _ION_LEGACY_H */

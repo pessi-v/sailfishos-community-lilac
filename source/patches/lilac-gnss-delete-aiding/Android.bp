@@ -1,0 +1,16 @@
+// Diagnostic only -- never shipped in the image.
+//    make -j4 lilac-gnss-delete-aiding
+cc_binary {
+    name: "lilac-gnss-delete-aiding",
+    srcs: ["main.cpp"],
+    shared_libs: [
+        "android.hardware.gnss@1.0",
+        "android.hardware.gnss@1.1",
+        "android.hardware.gnss@2.0",
+        "android.hardware.gnss@2.1",
+        "libhidlbase",
+        "libutils",
+        "liblog",
+    ],
+    cflags: ["-Wall", "-Wno-unused-parameter"],
+}

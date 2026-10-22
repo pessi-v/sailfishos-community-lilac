@@ -1,0 +1,10 @@
+--- libc/include/arpa/inet.h
++++ libc/include/arpa/inet.h
+@@ -33,6 +33,7 @@
+ #include <stdint.h>
+ #include <sys/cdefs.h>
+ #include <sys/types.h>
++#include <inaddr.h>
+ 
+ __BEGIN_DECLS
+ 

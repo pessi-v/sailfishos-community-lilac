@@ -1,0 +1,77 @@
+diff --git a/droidmediacodec.cpp b/droidmediacodec.cpp
+index 9df6c02..1cff4e6 100644
+--- a/droidmediacodec.cpp
++++ b/droidmediacodec.cpp
+@@ -1162,11 +1162,6 @@ void droid_media_codec_get_output_info(DroidMediaCodec *codec,
+   md->findInt32(android::kKeySampleRate, &info->sample_rate);
+   md->findInt32(android::kKeyColorFormat, &info->hal_format);
+ 
+-  info->stride = -1;
+-  info->slice_height = -1;
+-  md->findInt32(android::kKeyStride, &info->stride);
+-  md->findInt32(android::kKeySliceHeight, &info->slice_height);
+-
+   if (!md->findRect(android::kKeyCropRect, &crop->left, &crop->top, &crop->right, &crop->bottom)) {
+     crop->left = crop->top = 0;
+     crop->right = info->width;
+@@ -1178,6 +1173,16 @@ void droid_media_codec_get_output_info(DroidMediaCodec *codec,
+   }
+ }
+ 
++void droid_media_codec_get_output_layout(DroidMediaCodec *codec, DroidMediaCodecOutputLayout *layout)
++{
++  android::sp<android::MetaData> md(codec->m_codec->getFormat());
++
++  layout->stride = -1;
++  layout->slice_height = -1;
++  md->findInt32(android::kKeyStride, &layout->stride);
++  md->findInt32(android::kKeySliceHeight, &layout->slice_height);
++}
++
+ bool droid_media_codec_set_video_encoder_bitrate(DroidMediaCodec *codec, int32_t bitrate)
+ {
+ #if ANDROID_MAJOR >= 7
+diff --git a/droidmediacodec.h b/droidmediacodec.h
+index e9bb10c..1d31247 100644
+--- a/droidmediacodec.h
++++ b/droidmediacodec.h
+@@ -59,9 +59,18 @@ typedef struct {
+   int32_t sample_rate;
+   int32_t hal_format;
+   DroidMediaCodecFlags flags;
++} DroidMediaCodecMetaData;
++
++/* Row stride and padded slice height of the decoder output buffers, as reported by the codec's output
++ * format. Each member is -1 when the codec does not report it.
++ *
++ * This is deliberately a separate struct and not part of DroidMediaCodecMetaData: that struct is embedded
++ * as the first member of DroidMediaCodecDecoderMetaData and DroidMediaCodecEncoderMetaData, so adding
++ * members to it moves every following member of both and breaks binaries built against the old header. */
++typedef struct {
+   int32_t stride;
+   int32_t slice_height;
+-} DroidMediaCodecMetaData;
++} DroidMediaCodecOutputLayout;
+ 
+ typedef struct {
+   DroidMediaCodecMetaData parent;
+@@ -128,6 +137,7 @@ void droid_media_codec_flush(DroidMediaCodec *codec);
+ void droid_media_codec_drain(DroidMediaCodec *codec);
+ DroidMediaCodecLoopReturn droid_media_codec_loop(DroidMediaCodec *codec);
+ void droid_media_codec_get_output_info(DroidMediaCodec *codec, DroidMediaCodecMetaData *info, DroidMediaRect *crop);
++void droid_media_codec_get_output_layout(DroidMediaCodec *codec, DroidMediaCodecOutputLayout *layout);
+ 
+ bool droid_media_codec_set_video_encoder_bitrate(DroidMediaCodec *codec, int32_t bitrate);
+ 
+diff --git a/hybris.c b/hybris.c
+index 8e90a4a..7984f49 100644
+--- a/hybris.c
++++ b/hybris.c
+@@ -249,6 +249,7 @@ HYBRIS_WRAPPER_0_1(DroidMediaCodec *, droid_media_codec_flush);
+ HYBRIS_WRAPPER_0_1(DroidMediaCodec *, droid_media_codec_drain);
+ HYBRIS_WRAPPER_1_1(DroidMediaCodecLoopReturn,DroidMediaCodec*,droid_media_codec_loop);
+ HYBRIS_WRAPPER_0_3(DroidMediaCodec*,DroidMediaCodecMetaData*,DroidMediaRect*,droid_media_codec_get_output_info);
++HYBRIS_WRAPPER_0_2(DroidMediaCodec*,DroidMediaCodecOutputLayout*,droid_media_codec_get_output_layout);
+ HYBRIS_WRAPPER_1_2(bool,DroidMediaCodec*,int32_t,droid_media_codec_set_video_encoder_bitrate);
+ HYBRIS_WRAPPER_0_0(_droid_media_init)
+ HYBRIS_WRAPPER_0_0(droid_media_deinit)

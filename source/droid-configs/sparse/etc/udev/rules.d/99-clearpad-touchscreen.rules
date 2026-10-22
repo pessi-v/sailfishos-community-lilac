@@ -1,0 +1,19 @@
+# The clearpad driver's input device reports zero EV_KEY capability (confirmed via
+# `udevadm test`: "test_key: no EV_KEY capability") -- it only ever declares ABS_MT_*
+# axes, no BTN_TOUCH. systemd-udev's own input_id builtin requires BTN_TOUCH (or
+# similar EV_KEY bits) to classify a device as ID_INPUT_TOUCHSCREEN, so it silently
+# falls through to a generic ID_INPUT=1 only, and lipstick's evdevtouch plugin (which
+# discovers touch devices via udev's ID_INPUT_TOUCHSCREEN tag, not by opening every
+# /dev/input/eventN itself) never opens it at all -- confirmed directly: lipstick had
+# fds open to the power button/charger/volume-key devices but never to clearpad's
+# own event node, despite the kernel driver generating real, correct ABS_MT_POSITION_X/
+# Y/TRACKING_ID events the whole time. Same fix, same
+# exact rule, as the first port's own patches/99-clearpad-touchscreen.rules --
+# tag the panel by device name directly, bypassing
+# the broken auto-detection.
+# Must stay on one line (or use a trailing backslash): udev rules are line-based,
+# and split without one, the second line became its own match-less rule that
+# tagged *every* input device as a touchscreen -- lipstick then opened the
+# Bluetooth headset's AVRCP key device as touch input and segfaulted when it
+# vanished on a Bluetooth toggle.
+SUBSYSTEM=="input", KERNEL=="event*", ATTRS{name}=="clearpad", ENV{ID_INPUT}="1", ENV{ID_INPUT_TOUCHSCREEN}="1"

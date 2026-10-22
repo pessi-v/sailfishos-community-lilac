@@ -1,0 +1,12 @@
+diff --git a/ui/build/paths/config.go b/ui/build/paths/config.go
+index 5717401331..a25f8cde7f 100644
+--- a/ui/build/paths/config.go
++++ b/ui/build/paths/config.go
+@@ -75,6 +75,7 @@ func GetConfig(name string) PathConfig {
+ 
+ var Configuration = map[string]PathConfig{
+ 	"bash":    Allowed,
++	"cpio":    Allowed,
+ 	"dd":      Allowed,
+ 	"diff":    Allowed,
+ 	"dlv":     Allowed,

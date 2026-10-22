@@ -1,0 +1,141 @@
+diff --git a/tools/fs_config/fs_config_generator.py b/tools/fs_config/fs_config_generator.py
+index 1405fd3bc5..cc67c15688 100755
+--- a/tools/fs_config/fs_config_generator.py
++++ b/tools/fs_config/fs_config_generator.py
+@@ -11,7 +11,10 @@ Further documentation can be found in the README.
+ """
+ 
+ import argparse
+-import ConfigParser
++try:
++    import configparser as ConfigParser  # python3
++except ImportError:
++    import ConfigParser  # python2
+ import ctypes
+ import re
+ import sys
+@@ -439,12 +442,13 @@ class AIDHeaderParser(object):
+ 
+         # No core AIDs should be within any oem range.
+         for aid in self._aid_value_to_name:
++            aid_value = int(aid, 0)
+             for ranges in self._ranges.values():
+-                if Utils.in_any_range(aid, ranges):
++                if Utils.in_any_range(aid_value, ranges):
+                     name = self._aid_value_to_name[aid]
+                     raise ValueError(
+                         'AID "%s" value: %u within reserved OEM Range: "%s"' %
+-                        (name, aid, str(ranges)))
++                        (name, aid_value, str(ranges)))
+ 
+     @property
+     def ranges(self):
+@@ -1146,20 +1150,20 @@ class AIDArrayGen(BaseGenerator):
+         hdr = AIDHeaderParser(args['hdrfile'])
+         max_name_length = max(len(aid.friendly) + 1 for aid in hdr.aids)
+ 
+-        print AIDArrayGen._GENERATED
++        print(AIDArrayGen._GENERATED)
+         print
+-        print AIDArrayGen._INCLUDE
++        print(AIDArrayGen._INCLUDE)
+         print
+-        print AIDArrayGen._STRUCT_FS_CONFIG % max_name_length
++        print(AIDArrayGen._STRUCT_FS_CONFIG % max_name_length)
+         print
+-        print AIDArrayGen._OPEN_ID_ARRAY
++        print(AIDArrayGen._OPEN_ID_ARRAY)
+ 
+         for aid in hdr.aids:
+-            print AIDArrayGen._ID_ENTRY % (aid.friendly, aid.identifier)
++            print(AIDArrayGen._ID_ENTRY % (aid.friendly, aid.identifier))
+ 
+-        print AIDArrayGen._CLOSE_FILE_STRUCT
++        print(AIDArrayGen._CLOSE_FILE_STRUCT)
+         print
+-        print AIDArrayGen._COUNT
++        print(AIDArrayGen._COUNT)
+         print
+ 
+ 
+@@ -1202,15 +1206,15 @@ class OEMAidGen(BaseGenerator):
+ 
+         parser = FSConfigFileParser(args['fsconfig'], hdr_parser.ranges)
+ 
+-        print OEMAidGen._GENERATED
++        print(OEMAidGen._GENERATED)
+ 
+-        print OEMAidGen._FILE_IFNDEF_DEFINE
++        print(OEMAidGen._FILE_IFNDEF_DEFINE)
+ 
+         for aid in parser.aids:
+             self._print_aid(aid)
+             print
+ 
+-        print OEMAidGen._FILE_ENDIF
++        print(OEMAidGen._FILE_ENDIF)
+ 
+     def _print_aid(self, aid):
+         """Prints a valid #define AID identifier to stdout.
+@@ -1222,10 +1226,10 @@ class OEMAidGen(BaseGenerator):
+         # print the source file location of the AID
+         found_file = aid.found
+         if found_file != self._old_file:
+-            print OEMAidGen._FILE_COMMENT % found_file
++            print(OEMAidGen._FILE_COMMENT % found_file)
+             self._old_file = found_file
+ 
+-        print OEMAidGen._GENERIC_DEFINE % (aid.identifier, aid.value)
++        print(OEMAidGen._GENERIC_DEFINE % (aid.identifier, aid.value))
+ 
+ 
+ @generator('passwd')
+@@ -1308,7 +1312,7 @@ class PasswdGen(BaseGenerator):
+         except ValueError as exception:
+             sys.exit(exception)
+ 
+-        print "%s::%s:%s::/:%s" % (logon, uid, uid, aid.login_shell)
++        print("%s::%s:%s::/:%s" % (logon, uid, uid, aid.login_shell))
+ 
+ 
+ @generator('group')
+@@ -1333,7 +1337,7 @@ class GroupGen(PasswdGen):
+         except ValueError as exception:
+             sys.exit(exception)
+ 
+-        print "%s::%s:" % (logon, uid)
++        print("%s::%s:" % (logon, uid))
+ 
+ 
+ @generator('print')
+@@ -1356,7 +1360,7 @@ class PrintGen(BaseGenerator):
+         aids.sort(key=lambda item: int(item.normalized_value))
+ 
+         for aid in aids:
+-            print '%s %s' % (aid.identifier, aid.normalized_value)
++            print('%s %s' % (aid.identifier, aid.normalized_value))
+ 
+ 
+ def main():
+@@ -1370,7 +1374,7 @@ def main():
+     gens = generator.get()
+ 
+     # for each gen, instantiate and add them as an option
+-    for name, gen in gens.iteritems():
++    for name, gen in gens.items():
+ 
+         generator_option_parser = subparser.add_parser(name, help=gen.__doc__)
+         generator_option_parser.set_defaults(which=name)
+diff --git a/tools/releasetools/build_image.py b/tools/releasetools/build_image.py
+index 8cf074147e..7567346493 100755
+--- a/tools/releasetools/build_image.py
++++ b/tools/releasetools/build_image.py
+@@ -57,7 +57,7 @@ def GetDiskUsage(path):
+   Returns:
+     The number of bytes based on a 1K block_size.
+   """
+-  cmd = ["du", "-k", "-s", path]
++  cmd = ["du", "-b", "-k", "-s", path]
+   output = common.RunAndCheckOutput(cmd, verbose=False)
+   return int(output.split()[0]) * 1024
+ 

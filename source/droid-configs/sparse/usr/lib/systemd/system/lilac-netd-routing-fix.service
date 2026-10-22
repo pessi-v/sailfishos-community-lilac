@@ -1,0 +1,15 @@
+[Unit]
+Description=Reinstate the lookup main/default ip-rule fallback that real netd removes
+DefaultDependencies=no
+After=droid-hal-init.service
+Conflicts=shutdown.target
+
+[Service]
+Type=simple
+ExecStart=/bin/sh /usr/local/bin/lilac-netd-routing-fix.sh
+Restart=always
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

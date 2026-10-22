@@ -1,0 +1,32 @@
+bionic HEAD=6aaff2a54 diff=6790B untracked=4
+build/make HEAD=a744cb600e diff=4850B untracked=1
+build/soong HEAD=ac442d1758 diff=378B untracked=0
+device/sony/common HEAD=dc9448b diff=564B untracked=1
+device/sony/edo HEAD=e947a86 diff=789B untracked=0
+device/sony/lena HEAD=95fb8b3 diff=0B untracked=1
+device/sony/lilac HEAD=789cecf diff=1211B untracked=7
+external/scudo HEAD=9ae674f6f69 diff=882B untracked=0
+frameworks/av HEAD=fa34315231 diff=17132B untracked=1
+frameworks/base HEAD=49d8b986dddd diff=10754B untracked=1
+frameworks/native HEAD=f5ec83a6c9 diff=3343B untracked=0
+frameworks/opt/net/wifi HEAD=9e3d327ca diff=1179B untracked=0
+hardware/interfaces HEAD=787abcd502 diff=2116B untracked=0
+hardware/qcom/wlan HEAD=4ea030c diff=563B untracked=0
+hybris/hybris-boot HEAD=6547fd1 diff=5374B untracked=0
+kernel/sony/msm-4.14/common-headers HEAD=4b3c84b diff=286B untracked=0
+kernel/sony/msm-4.14/common-kernel HEAD=8db245937d42 diff=21160B untracked=4
+rpm HEAD=3e27c59 diff=0B untracked=3
+system/core HEAD=84e2bf5113 diff=45290B untracked=14
+system/hwservicemanager HEAD=9ed41f2 diff=2276B untracked=0
+system/linkerconfig HEAD=935f98a diff=3438B untracked=0
+system/vold HEAD=772008db diff=406B untracked=0
+vendor/oss/fingerprint HEAD=9dfd6e6 diff=945B untracked=3
+vendor/oss/timekeep HEAD=2c25053 diff=0B untracked=2
+vendor/qcom/opensource/data/ipacfg-mgr/sdm845 HEAD=ba108d8 diff=1701B untracked=0
+hybris/mw/libhybris HEAD=2b39e63191ad931a8440517f232a5f03beb692d3 remote=https://github.com/mer-hybris/libhybris diff=0B untracked=0
+hybris/mw/mce-plugin-libhybris HEAD=2c48a3f1724b9e82acd13addb70f3201508c811a remote=https://github.com/mer-hybris/mce-plugin-libhybris diff=0B untracked=19
+hybris/mw/pulseaudio-modules-droid HEAD=2bffd33f7927809e0444cccd50a455a0a34b3195 remote=https://github.com/mer-hybris/pulseaudio-modules-droid.git diff=0B untracked=2
+hybris/mw/pulseaudio-modules-droid-hidl HEAD=818df80bcb593250941d03150b236128da7fbc6a remote=https://github.com/mer-hybris/pulseaudio-modules-droid-hidl.git diff=0B untracked=2
+hybris/mw/qt5-qpa-hwcomposer-plugin HEAD=31f4f6506702bd872ac47305fc8f8d75f2bb047b remote=https://github.com/mer-hybris/qt5-qpa-hwcomposer-plugin diff=0B untracked=8
+hybris/mw/qtscenegraph-adaptation HEAD=6db62967601bf8d370580389fab1df36ed35c8d5 remote=https://github.com/sailfishos/qtscenegraph-adaptation.git diff=0B untracked=1
+hybris/mw/sensorfw HEAD=b889c3d20254e44bc408e64449562c84898506f1 remote=https://github.com/sailfishos/sensorfw.git diff=16153B untracked=2

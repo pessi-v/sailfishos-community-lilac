@@ -1,0 +1,49 @@
+diff --git a/contents/namespace/sphal.cc b/contents/namespace/sphal.cc
+index e97197f..ed2eab3 100644
+--- a/contents/namespace/sphal.cc
++++ b/contents/namespace/sphal.cc
+@@ -60,6 +60,22 @@ Namespace BuildSphalNamespace([[maybe_unused]] const Context& ctx) {
+           Var("VNDK_SAMEPROCESS_LIBRARIES_VENDOR", ""));
+       ns.GetLink(ctx.GetSystemNamespaceName())
+           .AddSharedLib(Var("LLNDK_LIBRARIES_VENDOR", ""));
++      // lilac: hwcomposer.msm8998.so is a pre-Treble HWC1 blob that
++      // directly needs libbinder.so, which is never in LLNDK/VNDK-SP on purpose --
++      // widened narrowly (one named library) so lipstick can load it via libhybris.
++      ns.GetLink(ctx.GetSystemNamespaceName()).AddSharedLib("libbinder.so");
++      // lilac: libhardware.so/libhardware_legacy.so, same reasoning as libbinder.so above
++      //: both are genuine NEEDED entries of the same blob,
++      // surfaced only once libbinder.so itself stopped being the first failure.
++      ns.GetLink(ctx.GetSystemNamespaceName()).AddSharedLib("libhardware.so");
++      ns.GetLink(ctx.GetSystemNamespaceName()).AddSharedLib("libhardware_legacy.so");
++      // lilac: libutils.so/libcutils.so/libsync.so/libc++.so/libui.so, same reasoning as libbinder.so/libhardware.so above
++      //.
++      ns.GetLink(ctx.GetSystemNamespaceName()).AddSharedLib("libutils.so");
++      ns.GetLink(ctx.GetSystemNamespaceName()).AddSharedLib("libcutils.so");
++      ns.GetLink(ctx.GetSystemNamespaceName()).AddSharedLib("libsync.so");
++      ns.GetLink(ctx.GetSystemNamespaceName()).AddSharedLib("libc++.so");
++      ns.GetLink(ctx.GetSystemNamespaceName()).AddSharedLib("libui.so");
+     }
+   } else {
+     // Once in this namespace, access to libraries in /system/lib is restricted.
+@@ -71,6 +87,21 @@ Namespace BuildSphalNamespace([[maybe_unused]] const Context& ctx) {
+     }
+     ns.GetLink(ctx.GetSystemNamespaceName())
+         .AddSharedLib(Var("LLNDK_LIBRARIES_VENDOR", ""));
++    // lilac: hwcomposer.msm8998.so is a pre-Treble HWC1 blob, same widening as above, in whichever branch
++    // actually governs a foreign (non-/system, non-/vendor) binary like lipstick.
++    ns.GetLink(ctx.GetSystemNamespaceName()).AddSharedLib("libbinder.so");
++    // lilac: libhardware.so/libhardware_legacy.so, same reasoning as libbinder.so above
++    //: both are genuine NEEDED entries of the same blob,
++    // surfaced only once libbinder.so itself stopped being the first failure.
++    ns.GetLink(ctx.GetSystemNamespaceName()).AddSharedLib("libhardware.so");
++    ns.GetLink(ctx.GetSystemNamespaceName()).AddSharedLib("libhardware_legacy.so");
++    // lilac: libutils.so/libcutils.so/libsync.so/libc++.so/libui.so, same reasoning as libbinder.so/libhardware.so above
++    //.
++    ns.GetLink(ctx.GetSystemNamespaceName()).AddSharedLib("libutils.so");
++    ns.GetLink(ctx.GetSystemNamespaceName()).AddSharedLib("libcutils.so");
++    ns.GetLink(ctx.GetSystemNamespaceName()).AddSharedLib("libsync.so");
++    ns.GetLink(ctx.GetSystemNamespaceName()).AddSharedLib("libc++.so");
++    ns.GetLink(ctx.GetSystemNamespaceName()).AddSharedLib("libui.so");
+     ns.GetLink("vndk").AddSharedLib(
+         Var("VNDK_SAMEPROCESS_LIBRARIES_VENDOR", ""));
+     ns.AddRequires(std::vector{"libneuralnetworks.so"});

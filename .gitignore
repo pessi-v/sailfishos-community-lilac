@@ -1,0 +1,8 @@
+# Images and Sony files are never committed: they are release downloads or come from Sony
+*.img
+*.img001
+*.img.gz
+*.img001.gz
+*.zip
+SW_binaries*
+.DS_Store

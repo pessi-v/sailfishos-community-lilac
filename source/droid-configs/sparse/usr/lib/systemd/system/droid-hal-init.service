@@ -1,0 +1,49 @@
+[Unit]
+Description=droid-hal-init
+# lilac: NOT Wants=systemd-udev-settle.service. systemd-udev-settle.service can never
+# succeed on this device -- a continuous kernel uevent storm from usbpd0/qpnp-smb2
+# power-supply status (re-firing every ~80-100ms, indefinitely, confirmed via `udevadm
+# monitor --kernel`) means udev never catches up to a queue that keeps growing faster than
+# it can drain, so it reliably hits its 120s default timeout every single boot.
+# Empirically confirmed that Wants=systemd-udev-settle.service
+# on the upstream unit cascades that repeated timeout into droid-hal-init itself restarting
+# roughly every two minutes for the rest of the boot, wiping the whole Android-side
+# environment (servicemanager, hwservicemanager, every lazy-started HAL) out from under
+# anything already connected to it. After= is kept (not dropped too) -- confirmed the hard
+# way that dropping the ordering as well as the activation stops hwservicemanager's own
+# lazy ctl.interface_start mechanism from ever firing correctly, a real regression caught
+# and reverted the same session.
+Wants=
+After=local-fs.target systemd-modules-load.service systemd-udev-settle.service systemd-tmpfiles-setup.service
+Before=basic.target network.target bluetooth.service ofono.service sensorfwd.service
+DefaultDependencies=no
+Conflicts=shutdown.target
+# Lets not do Requires= here as that means that this service will restart which leads automatically
+# to broken state as android init can be only started once per boot. If something goes wrong
+# our best hope is that android init doesn't notice that and that the crashing party fixes itself :)
+
+[Service]
+Type=notify
+NotifyAccess=all
+ProtectSystem=full
+ProtectHome=true
+PrivateTmp=true
+ExecStartPre=-/bin/sh /usr/bin/droid/droid-hal-early-init.sh
+ExecStart=/bin/sh /usr/bin/droid/droid-hal-startup.sh
+# Since droid-hal-shutdown.sh effectively kills the cgroup processes (as well as it's possible),
+# systemd can safely skip trying to kill any stubborn processes the second time, causing unncessary delay.
+KillMode=none
+ExecStop=/bin/sh /usr/bin/droid/droid-hal-shutdown.sh
+Restart=always
+# Lets make sure we don't block minutes in case of errors.
+# lilac: the start timeout was 15 s, but on a loaded boot (first boot with a fresh /home) Android
+# init needs longer to send READY. systemd then killed the start (KillMode=none leaves every Android
+# process running), restarted the unit, the second android init could not start (exit 11) and the unit
+# ended up "failed" while Android itself ran fine.
+TimeoutStartSec=120
+TimeoutStopSec=15
+StartLimitInterval=60
+StartLimitBurst=2
+
+[Install]
+WantedBy=graphical.target

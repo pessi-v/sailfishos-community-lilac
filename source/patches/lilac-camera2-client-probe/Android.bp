@@ -1,0 +1,20 @@
+// Diagnostic only -- never shipped in the image.
+//    make -j4 lilac-camera2-client-probe
+cc_binary {
+    name: "lilac-camera2-client-probe",
+    srcs: ["main.cpp"],
+    shared_libs: [
+        "libbinder",
+        "libcamera_client",
+        "libcamera_metadata",
+        "libcutils",
+        "libgui",
+        "liblog",
+        "libui",
+        "libutils",
+    ],
+    cflags: [
+        "-Wall",
+        "-Wno-unused-parameter",
+    ],
+}

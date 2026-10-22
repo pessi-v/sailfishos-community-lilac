@@ -1,0 +1,16 @@
+diff --git a/standalone/linux.h b/standalone/linux.h
+index c8e41484c85..cf01e385189 100644
+--- a/standalone/linux.h
++++ b/standalone/linux.h
+@@ -55,7 +55,10 @@ struct MapPlatformData {};
+ // The Android Bionic team has allocated a TLS slot for sanitizers starting
+ // with Q, given that Android currently doesn't support ELF TLS. It is used to
+ // store sanitizer thread specific data.
+-static const int TLS_SLOT_SANITIZER = 6;
++static const int TLS_SLOT_SANITIZER = 7;  // lilac: hybris-patches
++  // shift bionic's own TLS_SLOT_SANITIZER from 6 to 7 to free slot 6 for
++  // TLS_SLOT_STACK_GUARD -- this copy, independent of bionic/libc/platform/bionic/
++  // tls_defines.h by Scudo's own "standalone" design, must track that shift by hand.
+ 
+ ALWAYS_INLINE uptr *getAndroidTlsPtr() {
+   return reinterpret_cast<uptr *>(&__get_tls()[TLS_SLOT_SANITIZER]);

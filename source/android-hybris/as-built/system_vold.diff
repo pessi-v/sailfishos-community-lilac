@@ -1,0 +1,13 @@
+diff --git a/fs/Exfat.cpp b/fs/Exfat.cpp
+index 34f10240..6793f00d 100644
+--- a/fs/Exfat.cpp
++++ b/fs/Exfat.cpp
+@@ -41,7 +41,7 @@ bool IsSupported() {
+ status_t Check(const std::string& source) {
+     std::vector<std::string> cmd;
+     cmd.push_back(kFsckPath);
+-    cmd.push_back("-a");
++    cmd.push_back("-p");
+     cmd.push_back(source);
+ 
+     int rc = ForkExecvp(cmd, nullptr, sFsckUntrustedContext);

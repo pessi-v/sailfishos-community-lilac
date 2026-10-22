@@ -1,0 +1,209 @@
+diff --git a/libc/Android.bp b/libc/Android.bp
+index d3271ae91..87d4760c0 100644
+--- a/libc/Android.bp
++++ b/libc/Android.bp
+@@ -18,6 +18,7 @@ libc_common_src_files = [
+     "stdio/vfscanf.cpp",
+     "stdio/vfwscanf.c",
+     "stdlib/exit.c",
++    "hybris_support.c",
+ ]
+ 
+ // off64_t/time64_t support on LP32.
+@@ -49,7 +50,8 @@ libc_common_flags = [
+     "-Wexit-time-destructors",
+ 
+     // GWP-ASan requires platform TLS.
+-    "-fno-emulated-tls",
++    // Halium: ELF TLS currently breaks libhybris, so disable it
++    "-femulated-tls",
+ ]
+ 
+ // Define some common cflags
+@@ -1604,6 +1606,7 @@ cc_library {
+             "libc_common_shared",
+         ],
+     },
++    // cflags: ["-fno-emulated-tls"], - disabled for Halium
+ 
+     required: [
+         "tzdata",
+@@ -2449,7 +2452,7 @@ cc_defaults {
+     ],
+     cflags: [
+         "-DUSE_SCUDO",
+-        "-fno-emulated-tls", // Required for GWP-ASan.
++        // "-fno-emulated-tls", // Required for GWP-ASan. - disabled for Halium
+     ],
+     shared_libs: ["libscudo_wrapper"],
+ 
+diff --git a/libc/bionic/gwp_asan_wrappers.cpp b/libc/bionic/gwp_asan_wrappers.cpp
+index d3e6a14ce..51d498c23 100644
+--- a/libc/bionic/gwp_asan_wrappers.cpp
++++ b/libc/bionic/gwp_asan_wrappers.cpp
+@@ -47,6 +47,7 @@
+ #include "bionic/malloc_common_dynamic.h"
+ #endif  // LIBC_STATIC
+ 
++#ifdef DISABLED_FOR_HYBRIS_SUPPORT
+ static gwp_asan::GuardedPoolAllocator GuardedAlloc;
+ static const MallocDispatch* prev_dispatch;
+ 
+@@ -278,3 +279,19 @@ bool MaybeInitGwpAsan(libc_globals* globals, bool force_init) {
+ bool DispatchIsGwpAsan(const MallocDispatch* dispatch) {
+   return dispatch == &gwp_asan_dispatch;
+ }
++
++#else // DISABLED_FOR_HYBRIS_SUPPORT
++
++bool MaybeInitGwpAsanFromLibc(libc_globals* /*globals*/) {
++  return false;
++}
++
++bool MaybeInitGwpAsan(libc_globals* /*globals*/, bool /*force_init*/) {
++  return false;
++}
++
++bool DispatchIsGwpAsan(const MallocDispatch* /*dispatch*/) {
++  return false;
++}
++
++#endif // DISABLED_FOR_HYBRIS_SUPPORT
+diff --git a/libc/bionic/locale.cpp b/libc/bionic/locale.cpp
+index 0b7037afe..02a75dea8 100644
+--- a/libc/bionic/locale.cpp
++++ b/libc/bionic/locale.cpp
+@@ -37,11 +37,11 @@
+ 
+ #include "platform/bionic/macros.h"
+ 
+-#if defined(__BIONIC_BUILD_FOR_ANDROID_SUPPORT)
++//#if defined(__BIONIC_BUILD_FOR_ANDROID_SUPPORT)
+ #define USE_TLS_SLOT 0
+-#else
+-#define USE_TLS_SLOT 1
+-#endif
++//#else
++//#define USE_TLS_SLOT 1
++//#endif
+ 
+ #if USE_TLS_SLOT
+ #include "bionic/pthread_internal.h"
+diff --git a/libc/include/arpa/inet.h b/libc/include/arpa/inet.h
+index db054c9e1..7716b9445 100644
+--- a/libc/include/arpa/inet.h
++++ b/libc/include/arpa/inet.h
+@@ -33,6 +33,7 @@
+ #include <stdint.h>
+ #include <sys/cdefs.h>
+ #include <sys/types.h>
++#include <inaddr.h>
+ 
+ __BEGIN_DECLS
+ 
+diff --git a/libc/include/bits/in_addr.h b/libc/include/bits/in_addr.h
+index 30eb04b66..3e46dad2b 100644
+--- a/libc/include/bits/in_addr.h
++++ b/libc/include/bits/in_addr.h
+@@ -36,8 +36,7 @@
+ #include <sys/cdefs.h>
+ #include <stdint.h>
+ 
+-/** An integral type representing an IPv4 address. */
+-typedef uint32_t in_addr_t;
++#include <inaddr.h>
+ 
+ /** A structure representing an IPv4 address. */
+ struct in_addr {
+diff --git a/libc/include/sys/_system_properties.h b/libc/include/sys/_system_properties.h
+index 744a45b71..2f32bc28f 100644
+--- a/libc/include/sys/_system_properties.h
++++ b/libc/include/sys/_system_properties.h
+@@ -44,6 +44,8 @@ __BEGIN_DECLS
+ #define PROP_FILENAME "/dev/__properties__"
+ 
+ #define PROP_MSG_SETPROP 1
++#define PROP_MSG_GETPROP 2
++#define PROP_MSG_LISTPROP 3
+ #define PROP_MSG_SETPROP2 0x00020001
+ 
+ #define PROP_SUCCESS 0
+diff --git a/libc/libc.map.txt b/libc/libc.map.txt
+index 4bfb8a232..20f0a660a 100644
+--- a/libc/libc.map.txt
++++ b/libc/libc.map.txt
+@@ -41,6 +41,7 @@ LIBC {
+     __fstatfs64; # arm x86
+     __fwritable; # introduced=23
+     __get_h_errno;
++    __get_tls_hooks; # arm arm64 x86 introduced=21
+     __getcpu; # arm x86 introduced-arm=12 introduced-x86=12
+     __getcwd; # arm x86
+     __getpid; # arm x86 introduced=21
+diff --git a/libc/platform/bionic/tls_defines.h b/libc/platform/bionic/tls_defines.h
+index 78099b3d4..d558a2f17 100644
+--- a/libc/platform/bionic/tls_defines.h
++++ b/libc/platform/bionic/tls_defines.h
+@@ -84,12 +84,12 @@
+ #define TLS_SLOT_BIONIC_TLS     (-1)
+ #define TLS_SLOT_DTV              0
+ #define TLS_SLOT_THREAD_ID        1
+-#define TLS_SLOT_APP              2 // was historically used for errno
+-#define TLS_SLOT_OPENGL           3
+-#define TLS_SLOT_OPENGL_API       4
+-#define TLS_SLOT_STACK_GUARD      5
+-#define TLS_SLOT_SANITIZER        6 // was historically used for dlerror
+-#define TLS_SLOT_ART_THREAD_SELF  7
++#define TLS_SLOT_APP                // was historically used for errno
++#define TLS_SLOT_OPENGL           2
++#define TLS_SLOT_OPENGL_API       5
++#define TLS_SLOT_STACK_GUARD      6
++#define TLS_SLOT_SANITIZER        7 // was historically used for dlerror
++#define TLS_SLOT_ART_THREAD_SELF  3
+ 
+ // The maximum slot is fixed by the minimum TLS alignment in Bionic executables.
+ #define MAX_TLS_SLOT              7
+@@ -104,12 +104,12 @@
+ 
+ #define TLS_SLOT_SELF             0
+ #define TLS_SLOT_THREAD_ID        1
+-#define TLS_SLOT_APP              2 // was historically used for errno
+-#define TLS_SLOT_OPENGL           3
+-#define TLS_SLOT_OPENGL_API       4
+-#define TLS_SLOT_STACK_GUARD      5
+-#define TLS_SLOT_SANITIZER        6 // was historically used for dlerror
+-#define TLS_SLOT_ART_THREAD_SELF  7
++#define TLS_SLOT_APP                // was historically used for errno
++#define TLS_SLOT_OPENGL           2
++#define TLS_SLOT_OPENGL_API       5
++#define TLS_SLOT_STACK_GUARD      6
++#define TLS_SLOT_SANITIZER        7 // was historically used for dlerror
++#define TLS_SLOT_ART_THREAD_SELF  3
+ #define TLS_SLOT_DTV              8
+ #define TLS_SLOT_BIONIC_TLS       9
+ #define MAX_TLS_SLOT              9 // update this value when reserving a slot
+diff --git a/libc/system_properties/prop_area.cpp b/libc/system_properties/prop_area.cpp
+index 42bee9f3e..04be16230 100644
+--- a/libc/system_properties/prop_area.cpp
++++ b/libc/system_properties/prop_area.cpp
+@@ -79,7 +79,7 @@ prop_area* prop_area::map_prop_area_rw(const char* filename, const char* context
+        * property separation.
+        */
+       if (fsetxattr_failed) {
+-        *fsetxattr_failed = true;
++        *fsetxattr_failed = false;
+       }
+     }
+   }
+diff --git a/libdl/libdl_cfi.cpp b/libdl/libdl_cfi.cpp
+index 3b68fc7d3..5c09f609d 100644
+--- a/libdl/libdl_cfi.cpp
++++ b/libdl/libdl_cfi.cpp
+@@ -67,6 +67,7 @@ static uintptr_t cfi_check_addr(uint16_t v, void* Ptr) {
+ }
+ 
+ static inline void cfi_slowpath_common(uint64_t CallSiteTypeId, void* Ptr, void* DiagData) {
++  return;
+   uint16_t v = shadow_load(Ptr);
+   switch (v) {
+     case CFIShadow::kInvalidShadow:

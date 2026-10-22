@@ -1,0 +1,17 @@
+# lilac: surfaceflinger neutralised. `disabled` alone isn't
+# enough -- the composer HAL's, the allocator's and servicemanager's rc files all
+# `onrestart restart surfaceflinger`, and lipstick restarts the composer on every
+# launch. So the service runs /system/bin/true once and stays down.
+service surfaceflinger /system/bin/true
+    oneshot
+    class core animation
+    # lilac: disabled -- lipstick owns the composer, so surfaceflinger can only ever abort
+    # with 'failed to create composer client'.
+    disabled
+    user system
+    group graphics drmrpc readproc
+    capabilities SYS_NICE
+    task_profiles HighPerformance
+    socket pdx/system/vr/display/client     stream 0666 system graphics u:object_r:pdx_display_client_endpoint_socket:s0
+    socket pdx/system/vr/display/manager    stream 0666 system graphics u:object_r:pdx_display_manager_endpoint_socket:s0
+    socket pdx/system/vr/display/vsync      stream 0666 system graphics u:object_r:pdx_display_vsync_endpoint_socket:s0

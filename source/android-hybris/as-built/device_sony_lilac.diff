@@ -1,0 +1,22 @@
+diff --git a/BoardConfig.mk b/BoardConfig.mk
+index 022dfcb..0a703a3 100644
+--- a/BoardConfig.mk
++++ b/BoardConfig.mk
+@@ -48,3 +48,17 @@ BOARD_VENDORIMAGE_EXTFS_INODE_COUNT := 4096
+ BOARD_PROPERTY_OVERRIDES_SPLIT_ENABLED := true
+ 
+ #TARGET_TAP_TO_WAKE_NODE := "/sys/devices/virtual/input/clearpad/wakeup_gesture"
++
++# these five properties are present in the known-good
++# hybris-boot-v2-modemfix-kmsgdiag.img (built via a manual/scripted repack process
++# outside m hybris-boot) but were never added here, so every m hybris-boot build
++# silently ships without them -- confirmed to be the actual cause of the USB gadget
++# configfs failure (androidboot.configfs=true / androidboot.usbcontroller tell init
++# which controller to configure and how) and very likely the charger-mode CPU
++# throttling that follows it (androidboot.mode=normal preempts the bootloaders own
++# androidboot.mode=charger, which offlines 7 of 8 cores).
++BOARD_KERNEL_CMDLINE += androidboot.mode=normal
++BOARD_KERNEL_CMDLINE += androidboot.configfs=true
++BOARD_KERNEL_CMDLINE += androidboot.usbcontroller=a800000.dwc3
++BOARD_KERNEL_CMDLINE += data_subdir=sfos-v2
++BOARD_KERNEL_CMDLINE += jolla.test_mode=USER

@@ -1,0 +1,15 @@
+diff --git a/rootdir/vendor/etc/init/init.edo.rc b/rootdir/vendor/etc/init/init.edo.rc
+index 74f540e..5b0c322 100644
+--- a/rootdir/vendor/etc/init/init.edo.rc
++++ b/rootdir/vendor/etc/init/init.edo.rc
+@@ -69,3 +69,10 @@ on property:sys.boot_completed=1
+     write /sys/block/sdc/queue/iostats 1
+     write /sys/block/dm-0/queue/read_ahead_kb 512
+     write /sys/block/dm-1/queue/read_ahead_kb 512
++
++# LMK tuning
++    write /sys/module/lowmemorykiller/parameters/enable_lmk 1
++    write /sys/module/lowmemorykiller/parameters/minfree "334320, 380400, 426480, 472560, 712980"
++    write /sys/module/lowmemorykiller/parameters/adj "0,58,147,529,1000"
++    write /sys/module/lowmemorykiller/parameters/vmpressure_file_min 105984
++    write /sys/module/lowmemorykiller/parameters/oom_reaper 1

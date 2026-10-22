@@ -1,0 +1,16 @@
+[Unit]
+Description=Add defaultuser to the privileged group (missing first-boot account provisioning)
+DefaultDependencies=no
+Before=systemd-user-sessions.service multi-user.target
+After=local-fs.target
+Conflicts=shutdown.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/sh /usr/bin/droid/lilac-fix-privileged-group.sh
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

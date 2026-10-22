@@ -1,0 +1,93 @@
+diff --git a/drivers/scsi/ufs/ufshcd.c b/drivers/scsi/ufs/ufshcd.c
+index fad486ec425a..a39f8e279db1 100644
+--- a/drivers/scsi/ufs/ufshcd.c
++++ b/drivers/scsi/ufs/ufshcd.c
+@@ -254,6 +254,10 @@ static void ufshcd_update_uic_error_cnt(struct ufs_hba *hba, u32 reg, int type)
+ /* default value of ref clock gating wait time is 100 micro seconds */
+ #define UFSHCD_REF_CLK_GATING_WAIT_US 100 /* microsecs */
+ 
++/* lilac 171: attempts at UFS device detection (deferred) before giving up */
++#define UFSHCD_LILAC_DETECT_RETRIES 3
++#define UFSHCD_LILAC_DETECT_DELAY_SECS 3
++
+ #define UFSHCD_CLK_GATING_DELAY_MS_PWR_SAVE	10
+ #define UFSHCD_CLK_GATING_DELAY_MS_PERF		50
+ 
+@@ -9133,6 +9137,36 @@ static int ufshcd_extcon_unregister(struct ufs_hba *hba)
+ 	return ret;
+ }
+ 
++/*
++ * lilac 171: deferred device-detection retry. See patches/patch-ufs-retry-device-detect-
++ * deferred-414.py for the reasoning (immediate retry crashed the phone, 3 s later works).
++ */
++static struct ufs_hba *lilac_detect_hba;
++static void lilac_detect_retry_fn(struct work_struct *w);
++static DECLARE_DELAYED_WORK(lilac_detect_retry_work, lilac_detect_retry_fn);
++
++static void lilac_detect_retry_fn(struct work_struct *w)
++{
++	struct ufs_hba *hba = lilac_detect_hba;
++	int i, err = -EIO;
++
++	for (i = 1; err && i <= UFSHCD_LILAC_DETECT_RETRIES; i++) {
++		dev_err(hba->dev, "%s: retry %d/%d with full device reset\n",
++			__func__, i, UFSHCD_LILAC_DETECT_RETRIES);
++		ufshcd_hold_all(hba);
++		/* ufshcd_probe_hba() drops one runtime-PM reference on every exit here */
++		pm_runtime_get_sync(hba->dev);
++		err = ufshcd_detect_device(hba);
++		ufshcd_release_all(hba);
++	}
++	if (err)
++		dev_err(hba->dev, "%s: device detection failed after %d retries (%d)\n",
++			__func__, UFSHCD_LILAC_DETECT_RETRIES, err);
++	else
++		dev_err(hba->dev, "%s: device detected after %d retry(ies)\n",
++			__func__, i - 1);
++}
++
+ /**
+  * ufshcd_async_scan - asynchronous execution for probing hba
+  * @data: data pointer to pass to this function
+@@ -9141,13 +9175,22 @@ static int ufshcd_extcon_unregister(struct ufs_hba *hba)
+ static void ufshcd_async_scan(void *data, async_cookie_t cookie)
+ {
+ 	struct ufs_hba *hba = (struct ufs_hba *)data;
++	int ret;
+ 
+ 	/*
+ 	 * Don't allow clock gating and hibern8 enter for faster device
+ 	 * detection.
+ 	 */
+ 	ufshcd_hold_all(hba);
+-	ufshcd_probe_hba(hba);
++	ret = ufshcd_probe_hba(hba);
++	if (ret) {
++		dev_err(hba->dev,
++			"%s: device detection failed (%d), retry in %d s\n",
++			__func__, ret, UFSHCD_LILAC_DETECT_DELAY_SECS);
++		lilac_detect_hba = hba;
++		schedule_delayed_work(&lilac_detect_retry_work,
++				      UFSHCD_LILAC_DETECT_DELAY_SECS * HZ);
++	}
+ 	ufshcd_release_all(hba);
+ 
+ 	ufshcd_extcon_register(hba);
+@@ -11194,6 +11237,16 @@ int ufshcd_init(struct ufs_hba *hba, void __iomem *mmio_base, unsigned int irq)
+ 	/* Enable debug prints */
+ 	hba->ufshcd_dbg_print = DEFAULT_UFSHCD_DBG_PRINT_EN;
+ 
++	/*
++	 * lilac 10.129: seed the ref-clk gating wait before anything can gate the
++	 * device reference clock. It is otherwise 0 until
++	 * ufshcd_get_dev_ref_clk_gating_wait() runs, which is only after the device
++	 * descriptor has been read -- so the early gates take udelay(0) where 4.4
++	 * always took udelay(1), and the device can stop answering UPIU queries.
++	 * Overwritten with the device's own value as soon as it can be read.
++	 */
++	hba->dev_ref_clk_gating_wait = UFSHCD_REF_CLK_GATING_WAIT_US;
++
+ 	err = ufshcd_set_dma_mask(hba);
+ 	if (err) {
+ 		dev_err(hba->dev, "set dma mask failed\n");

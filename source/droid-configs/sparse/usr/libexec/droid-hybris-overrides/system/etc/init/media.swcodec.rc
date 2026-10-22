@@ -1,0 +1,15 @@
+# Codec2 software codec service from the com.android.media.swcodec APEX (staged into
+# /apex by droid-hal-prepare.sh like the other APEX payloads). This port never runs
+# apexd, so init never reads the APEX's own etc/init.rc -- this is a copy of it.
+#
+# Without it, minimediaservice (droidmedia) waits forever in
+# "getService: Trying again for android.hardware.media.c2@1.0::IComponentStore/software",
+# gst-droid's codec query blocks in binder_thread_read, and so does gst-plugin-scanner:
+# every GStreamer app (Media, CSD video playback) hangs on its first launch on a fresh
+# /home and then gets killed.
+service media.swcodec /apex/com.android.media.swcodec/bin/mediaswcodec
+    class main
+    user mediacodec
+    group camera drmrpc mediadrm
+    ioprio rt 4
+    writepid /dev/cpuset/foreground/tasks

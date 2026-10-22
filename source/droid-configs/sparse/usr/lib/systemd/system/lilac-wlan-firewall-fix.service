@@ -1,0 +1,15 @@
+[Unit]
+Description=Keep INPUT open on wlan0, which netd/connman firewall reloads otherwise drop
+DefaultDependencies=no
+After=droid-hal-init.service
+Conflicts=shutdown.target
+
+[Service]
+Type=simple
+ExecStart=/bin/sh /usr/local/bin/lilac-wlan-firewall-fix.sh
+Restart=always
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

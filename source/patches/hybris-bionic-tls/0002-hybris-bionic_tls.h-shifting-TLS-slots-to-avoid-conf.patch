@@ -1,0 +1,38 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Ricardo Salveti de Araujo <ricardo.salveti@canonical.com>
+Date: Thu, 9 Jan 2014 00:57:01 -0200
+Subject: [PATCH] (hybris) bionic_tls.h: shifting TLS slots to avoid conflicts
+ with libc/hybris
+
+Change-Id: Idf503fe8fa0a24edf4dbbabaa8d3a1c2d1f60295
+Signed-off-by: Ricardo Salveti de Araujo <ricardo.salveti@canonical.com>
+
+Conflicts:
+	libc/private/bionic_tls.h
+---
+ libc/platform/bionic/tls_defines.h | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/libc/platform/bionic/tls_defines.h b/libc/platform/bionic/tls_defines.h
+index 78099b3d41287e7e642682a15a5d2c3440266cf7..e7ada69a86f749ecdadad39e2b2dac19a9795bcd 100644
+--- a/libc/platform/bionic/tls_defines.h
++++ b/libc/platform/bionic/tls_defines.h
+@@ -84,12 +84,12 @@
+ #define TLS_SLOT_BIONIC_TLS     (-1)
+ #define TLS_SLOT_DTV              0
+ #define TLS_SLOT_THREAD_ID        1
+-#define TLS_SLOT_APP              2 // was historically used for errno
+-#define TLS_SLOT_OPENGL           3
+-#define TLS_SLOT_OPENGL_API       4
+-#define TLS_SLOT_STACK_GUARD      5
+-#define TLS_SLOT_SANITIZER        6 // was historically used for dlerror
+-#define TLS_SLOT_ART_THREAD_SELF  7
++#define TLS_SLOT_APP                // was historically used for errno
++#define TLS_SLOT_OPENGL           2
++#define TLS_SLOT_OPENGL_API       5
++#define TLS_SLOT_STACK_GUARD      6
++#define TLS_SLOT_SANITIZER        7 // was historically used for dlerror
++#define TLS_SLOT_ART_THREAD_SELF
+ 
+ // The maximum slot is fixed by the minimum TLS alignment in Bionic executables.
+ #define MAX_TLS_SLOT              7

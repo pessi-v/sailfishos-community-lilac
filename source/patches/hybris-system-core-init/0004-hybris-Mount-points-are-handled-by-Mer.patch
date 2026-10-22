@@ -1,0 +1,23 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: David Greaves <david@dgreaves.com>
+Date: Tue, 22 Oct 2013 17:09:20 +0100
+Subject: [PATCH] (hybris) Mount points are handled by Mer
+
+Change-Id: I295b30a47b6e147b037275032a00b304085fe711
+---
+ rootdir/init.rc | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/rootdir/init.rc b/rootdir/init.rc
+index 7dd6712151f9997c6398d3abc87d7d74a8ae30e6..68c3f01a2748d6b6c8a865d3b36760278b1d5905 100644
+--- a/rootdir/init.rc
++++ b/rootdir/init.rc
+@@ -465,7 +465,7 @@ on post-fs
+ 
+     # Once everything is setup, no need to modify /.
+     # The bind+remount combination allows this to work in containers.
+-    mount rootfs rootfs / remount bind ro nodev
++    # mount rootfs rootfs / remount bind ro nodev
+ 
+     # Make sure /sys/kernel/debug (if present) is labeled properly
+     # Note that tracefs may be mounted under debug, so we need to cross filesystems

@@ -1,0 +1,29 @@
+diff --git a/droidmediacodec.cpp b/droidmediacodec.cpp
+index 9df6c02..9d75d22 100644
+--- a/droidmediacodec.cpp
++++ b/droidmediacodec.cpp
+@@ -1162,11 +1162,6 @@ void droid_media_codec_get_output_info(DroidMediaCodec *codec,
+   md->findInt32(android::kKeySampleRate, &info->sample_rate);
+   md->findInt32(android::kKeyColorFormat, &info->hal_format);
+ 
+-  info->stride = -1;
+-  info->slice_height = -1;
+-  md->findInt32(android::kKeyStride, &info->stride);
+-  md->findInt32(android::kKeySliceHeight, &info->slice_height);
+-
+   if (!md->findRect(android::kKeyCropRect, &crop->left, &crop->top, &crop->right, &crop->bottom)) {
+     crop->left = crop->top = 0;
+     crop->right = info->width;
+diff --git a/droidmediacodec.h b/droidmediacodec.h
+index e9bb10c..908da77 100644
+--- a/droidmediacodec.h
++++ b/droidmediacodec.h
+@@ -59,8 +59,6 @@ typedef struct {
+   int32_t sample_rate;
+   int32_t hal_format;
+   DroidMediaCodecFlags flags;
+-  int32_t stride;
+-  int32_t slice_height;
+ } DroidMediaCodecMetaData;
+ 
+ typedef struct {

@@ -1,0 +1,60 @@
+diff --git a/AccessControl.cpp b/AccessControl.cpp
+index c8366ca..bacb3d5 100644
+--- a/AccessControl.cpp
++++ b/AccessControl.cpp
+@@ -37,6 +37,18 @@ struct audit_data {
+ using android::FQName;
+ 
+ AccessControl::AccessControl() {
++    // hybris: no SELinux policy is loaded on this system. Aborting here is what would end
++    // the boot (this service is `critical` in its .rc). See patch header -- not currently
++    // triggered (both calls below happen to survive a missing policy on this build), kept
++    // as a defensive fallback rather than relied on.
++    mSeEnabled = (is_selinux_enabled() == 1);
++    if (!mSeEnabled) {
++        ALOGW("SELinux not enabled; hwservicemanager access control disabled");
++        mSeContext = nullptr;
++        mSeHandle = nullptr;
++        return;
++    }
++
+     mSeHandle = selinux_android_hw_service_context_handle();
+     LOG_ALWAYS_FATAL_IF(mSeHandle == nullptr, "Failed to acquire SELinux handle.");
+ 
+@@ -54,6 +66,7 @@ AccessControl::AccessControl() {
+ }
+ 
+ bool AccessControl::canAdd(const std::string& fqName, const CallingContext& callingContext) {
++    if (!mSeEnabled) return true;
+     FQName fqIface;
+ 
+     if (!FQName::parse(fqName, &fqIface)) {
+@@ -65,6 +78,7 @@ bool AccessControl::canAdd(const std::string& fqName, const CallingContext& call
+ }
+ 
+ bool AccessControl::canGet(const std::string& fqName, const CallingContext& callingContext) {
++    if (!mSeEnabled) return true;
+     FQName fqIface;
+ 
+     if (!FQName::parse(fqName, &fqIface)) {
+@@ -76,6 +90,7 @@ bool AccessControl::canGet(const std::string& fqName, const CallingContext& call
+ }
+ 
+ bool AccessControl::canList(const CallingContext& callingContext) {
++    if (!mSeEnabled) return true;
+     return checkPermission(callingContext, mSeContext, kPermissionList, nullptr);
+ }
+ 
+diff --git a/AccessControl.h b/AccessControl.h
+index 6462d28..ba50c01 100644
+--- a/AccessControl.h
++++ b/AccessControl.h
+@@ -45,6 +45,8 @@ private:
+ 
+     static int auditCallback(void *data, security_class_t cls, char *buf, size_t len);
+ 
++    // hybris: false when no SELinux policy is loaded -> allow everything.
++    bool                   mSeEnabled;
+     char*                  mSeContext;
+     struct selabel_handle* mSeHandle;
+     union selinux_callback mSeCallbacks;

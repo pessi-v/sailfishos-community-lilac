@@ -1,0 +1,131 @@
+diff --git a/fixup-mountpoints b/fixup-mountpoints
+index 8e66c1d..7b51215 100755
+--- a/fixup-mountpoints
++++ b/fixup-mountpoints
+@@ -844,7 +844,7 @@ case "$DEVICE" in
+             -e 's block/bootdevice/by-name/tzxflattest sda27 ' \
+             -e 's block/bootdevice/by-name/tzxflattestbak sda28 ' \
+             -e 's block/bootdevice/by-name/tzxflbak sda30 ' \
+-            -e 's block/bootdevice/by-name/userdata sda66 ' \
++            -e 's block/bootdevice/by-name/userdata mmcblk0p2 ' \
+             -e 's block/bootdevice/by-name/vbmeta sda57 ' \
+             -e 's block/bootdevice/by-name/vendor sda64 ' \
+             -e 's block/bootdevice/by-name/xbl sdb1 ' \
+diff --git a/init-script b/init-script
+index 79e39d9..b00d9dd 100755
+--- a/init-script
++++ b/init-script
+@@ -156,6 +156,41 @@ load_kernel_modules() {
+     done
+ }
+ 
++# --- SD-card logging (Sailfish lilac-v2 port) ------------------------------
++# /init.log lives in the initramfs tmpfs and is lost when a failed boot
++# resets. Mirror it, plus a dmesg snapshot, to the microSD's sfos-v2
++# subdirectory at each checkpoint so the last one reached survives a hard
++# reset even with nothing captured in pstore. Same technique as the first
++# port's own patches/patch-initscript-sdlog.py -- deliberately a SEPARATE
++# subdir (sfos-v2), never sfos-data/sfos-414.
++SDLOG=""
++sdlog_init() {
++    mkdir -p /sdlog
++    if mount -t ext4 /dev/mmcblk0p2 /sdlog 2>/dev/null; then
++        mkdir -p /sdlog/sfos-v2
++        SDLOG=/sdlog/sfos-v2/boot.log
++        : > $SDLOG
++        echo "=== hybris-boot init (v2/SODP), $(date) ===" >> $SDLOG
++        sdlog_mark "sdlog-mounted"
++    fi
++}
++sdlog_mark() {
++    [ -n "$SDLOG" ] || return 0
++    {
++        echo
++        echo "########## CHECKPOINT: $1"
++        echo "--- /init.log ---"
++        cat /init.log 2>/dev/null
++        echo "--- dmesg (tail) ---"
++        dmesg 2>/dev/null | tail -n 120
++        echo "--- block devices ---"
++        ls -l /dev/mmcblk* /dev/sd* 2>/dev/null
++        echo "--- mounts ---"
++        cat /proc/mounts 2>/dev/null
++    } >> $SDLOG 2>&1
++    sync
++}
++
+ mount_stowaways() {
+     echo "########################## mounting stowaways"
+     if [ ! -z $DATA_PARTITION ]; then
+@@ -349,7 +384,7 @@ check_kernel_config() {
+ 	echo "No /proc/config.gz. Enable CONFIG_IKCONFIG and CONFIG_IKCONFIG_PROC" >> /diagnosis.log
+     else
+ 	# Must be =y
+-	for x in CONFIG_CGROUPS CONFIG_AUTOFS4_FS CONFIG_DEVTMPFS_MOUNT CONFIG_DEVTMPFS CONFIG_UNIX CONFIG_INOTIFY_USER CONFIG_SYSVIPC CONFIG_NET CONFIG_PROC_FS CONFIG_SIGNALFD CONFIG_SYSFS CONFIG_TMPFS_POSIX_ACL CONFIG_VT; do
++	for x in CONFIG_CGROUPS CONFIG_AUTOFS4_FS CONFIG_DEVTMPFS_MOUNT CONFIG_DEVTMPFS CONFIG_UNIX CONFIG_INOTIFY_USER CONFIG_SYSVIPC CONFIG_NET CONFIG_PROC_FS CONFIG_SIGNALFD CONFIG_SYSFS CONFIG_TMPFS_POSIX_ACL; do # CONFIG_VT deliberately excluded, see patch-initscript-no-vt-check.py
+ 		zcat /proc/config.gz | grep -E "^$x=y\$" || echo "$x=y not found in /proc/config.gz" >> /diagnosis.log
+  	done
+ 	# Must not be =y
+@@ -377,11 +412,17 @@ if [ "$DONE_SWITCH" = "no" ]; then
+     ln -s . /dev/block
+     ln -s /proc/mounts /etc/mtab
+ 
++    # SD-card logging: start as early as block devices exist.
++    sdlog_init
++
+     check_kernel_config
++    sdlog_mark "after-check_kernel_config"
+ 
+     bootsplash
++    sdlog_mark "after-bootsplash"
+ 
+     mount_stowaways
++    sdlog_mark "after-mount_stowaways"
+ 
+     # No target debug unless we debug here too (for now)
+ 
+@@ -414,14 +455,17 @@ if [ "$DONE_SWITCH" = "no" ]; then
+     echo "" > /proc/sys/kernel/hotplug
+ 
+     if [ -f "/target/init-debug" ]; then
++	sdlog_mark "before-switch_root (init-debug path)"
+ 	exec switch_root /target /init-debug &> /target/init-debug-stderrout
+     else
+ 	# Prefer /sbin/preinit over /sbin/init
+ 	[ -x /target/sbin/preinit ] && INIT=/sbin/preinit || INIT=/sbin/init
++	sdlog_mark "before-switch_root INIT=$INIT executable=$([ -x "/target$INIT" ] && echo yes || echo no)"
+ 	if [ -x "/target$INIT" ]; then
+ 	    exec switch_root /target $INIT --log-level=debug --log-target=kmsg &> /target/init-stderrout
+ 	fi
+     fi
++    sdlog_mark "switch_root fell through -- entering run_debug_session"
+     run_debug_session "Failed to boot init in real rootfs"
+ 
+ else
+@@ -431,10 +475,17 @@ else
+ 
+     do_mount_devprocsys
+ 
++    # Re-establish SD logging: SDLOG does not survive the exec into
++    # /init-debug (this is a fresh interpretation of the same script).
++    sdlog_init
++    sdlog_mark "entered real rootfs as init-debug"
++
+     HALT_BOOT="n"
+     [ -f /init_enter_debug2 ] && HALT_BOOT="y"
+     [ -f /init_disable_telnet ] && DISABLE_TELNET="y"
++    sdlog_mark "before-real-init-debug-session"
+     run_debug_session "init-debug in real rootfs" $HALT_BOOT
++    sdlog_mark "after-real-init-debug-session"
+ 
+     # If we don't do this then udev will not be able to create /dev/block/*
+     rm /dev/block
+@@ -442,6 +493,8 @@ else
+     # Now try to boot the real init
+     # Prefer /sbin/preinit over /sbin/init
+     [ -x /sbin/preinit ] && INIT=/sbin/preinit || INIT=/sbin/init
++    sdlog_mark "before-exec-real-init INIT=$INIT executable=$([ -x "$INIT" ] && echo yes || echo no)"
+     exec $INIT --log-level=debug --log-target=kmsg &> /boot/systemd_stdouterr
++    sdlog_mark "exec of real init returned -- this should be unreachable"
+     run_debug_session "init in real rootfs failed"
+ fi
