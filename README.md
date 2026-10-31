@@ -1,7 +1,7 @@
 # Sailfish OS for the Sony Xperia XZ1 Compact (lilac, G8441): community image
 
 
-A community port of Sailfish OS 5.1.0.11 for the **Sony Xperia XZ1 Compact, model G8441**, installed to internal storage in the
+A community port of Sailfish OS 5.2.0.22 for the **Sony Xperia XZ1 Compact, model G8441**, installed to internal storage in the
 Sailfish X layout (LVM user data, factory reset, modular boot image). It is not affiliated with or endorsed by Jolla or Sony and comes
 with no warranty. **Flashing erases everything on the phone.** Back up first.
 
@@ -101,7 +101,7 @@ Please report issues. Generally things should work, but needs testing.
 ## What is in the images, and licences
 
 - `hybris-boot.img`: Linux kernel 4.14 (GPL-2.0) and the Sailfish X initrd (GPL-2.0).
-- `sailfish.img001`: the Sailfish OS 5.1.0.11 root and home file systems, with the Android hardware-adaptation layer built from AOSP-based sources.
+- `sailfish.img001`: the Sailfish OS 5.2.0.22 root and home file systems, with the Android hardware-adaptation layer built from AOSP-based sources.
   Almost all of it is unmodified software from Jolla's public package repositories (`releases.jolla.com`), including Jolla's closed-source
   packages (the user interface and its apps). Those packages are included as Jolla publishes them and remain under Jolla's terms (shown in
   Settings > About on the phone).

@@ -23,7 +23,7 @@ Same root shape though: a halt-bit poll on a not-yet-powered modem-domain clock.
 Standard Qualcomm treatment: BRANCH_HALT_SKIP (write the enable, skip the
 unreliable readback poll).
 
-Confirmed against our own oldlenny source (drivers/clk/qcom/gcc-msm8998.c,
+Confirmed against the build tree (drivers/clk/qcom/gcc-msm8998.c,
 gcc_mss_cfg_ahb_clk at .halt_reg = 0x8A000) that it already has an EXPLICIT
 `.halt_check = BRANCH_HALT,` line -- so this patch replaces that line's value
 in-place rather than inserting a new field. Idempotent. Run from the 4.14 kernel

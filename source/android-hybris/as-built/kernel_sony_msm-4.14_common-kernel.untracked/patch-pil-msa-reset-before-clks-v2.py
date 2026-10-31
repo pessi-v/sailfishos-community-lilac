@@ -4,7 +4,7 @@
 Ported from the first port's own patch-pil-msa-reset-before-clks-414.py:
 the root cause of the modem MBA-load
 failure, found there by diffing pil_mss_reset() against a working 4.4 kernel for
-this exact SoC. Confirmed our own oldlenny source has the same broken ordering
+this exact SoC. Confirmed against the build tree, which has the same broken ordering
 (drivers/soc/qcom/pil-msa.c, pil_mss_reset()) and is otherwise unmodified.
 
 Working order (4.4):

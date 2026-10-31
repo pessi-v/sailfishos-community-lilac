@@ -1,4 +1,4 @@
-# Corresponding source for the community image (Xperia XZ1 Compact, release 1.0)
+# Corresponding source for the community image (Xperia XZ1 Compact, release 1.1)
 
 The images in the release contain software under the GNU GPL, LGPL and other licences. This directory holds, or points to, the source
 for the parts that were built or changed, and says where the source of everything else comes from. Sony's proprietary binaries are

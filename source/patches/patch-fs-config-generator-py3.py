@@ -5,9 +5,9 @@ Python 2 and Python 3.
 This script is invoked from two genuinely different execution contexts, each
 with a different `python` on PATH:
 1. droid-hal-device's build step (`fs_config_generator.py aidarray ...`,
-   invoked via mb2/sb2 inside the sfossdk Platform SDK) -- that chroot and its
+   invoked via mb2/sb2 inside the Platform SDK) -- that chroot and its
    aarch64 target ship ONLY python3 (3.11); no `python`/python2 binary exists
-   there or on oldlenny's own Ubuntu 26.04 host at all.
+   there or on the build host at all.
 2. The Android tree's own Soong build (`passwd_gen_product`/`_odm`/`_vendor`
    genrules, hit by an ordinary `m <target>` once enough of the tree needs
    building) -- that runs host tools through Soong's `sbox` sandbox, which

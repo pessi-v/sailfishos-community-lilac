@@ -5,7 +5,7 @@
 // Adapted from the sibling port's own probe (patch-camera2-client-probe.py)
 // for THIS project's own, much older Android 11
 // ICameraService/ICameraDeviceUser AIDL surface -- confirmed against the
-// actual generated headers in oldlenny's own out/soong/.intermediates tree
+// actual generated headers in the build tree's own out/soong/.intermediates tree
 // rather than assumed: no AttributionSourceState, no targetSdk/rotation/
 // policy/sharedMode parameters (all later Android additions), plain
 // String16 camera ids, and connectDevice takes opPackageName + a nullable
