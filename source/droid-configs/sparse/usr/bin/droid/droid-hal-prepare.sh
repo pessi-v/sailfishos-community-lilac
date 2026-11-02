@@ -145,6 +145,8 @@ if ! test -e /system/etc/linker.config.pb 2>/dev/null; then
     # system on /system" can never work -- confirmed directly against a live device.
     [ "$(stat -c '%d:%i' /system 2>/dev/null)" = "$(stat -c '%d:%i' "$REAL/system" 2>/dev/null)" ] || \
         mount --bind "$REAL/system" /system
+    # /system is a peer of $REAL: without this every per-file bind below is listed a second time under $REAL.
+    mount --make-private /system 2>/dev/null || true
 fi
 
 # 2. This port's from-source AOSP-11 build and the phone's factory /system partition
@@ -152,16 +154,26 @@ fi
 #    symbols being the most visible; several other libraries mismatched in the opposite
 #    direction). Prefer our own build's copy wherever a library exists under both names,
 #    leaving factory-only libraries (proprietary HAL/vendor pieces we don't build) alone.
-for f in /usr/libexec/droid-hybris/system/lib64/*.so; do
-    name=$(basename "$f")
-    target="/system/lib64/$name"
-    [ -f "$target" ] && mount --bind "$f" "$target" 2>/dev/null || true
-done
-for f in /usr/libexec/droid-hybris/system/lib/*.so; do
-    name=$(basename "$f")
-    target="/system/lib/$name"
-    [ -f "$target" ] && mount --bind "$f" "$target" 2>/dev/null || true
-done
+#    Only the files that really differ from the mounted image are bound (795 of 846 are identical on the
+#    flash build, and every bind is an entry in the mount table that each sandbox start walks again and
+#    again). If the comparison is not available or fails, every existing file is bound, as before.
+SYSLIB=/usr/libexec/droid-hybris/system
+if differing=$(python3 -I /usr/bin/droid/lilac-differing-libs.py "$SYSLIB" 2>/dev/null); then
+    for rel in $differing; do
+        mount --bind "$SYSLIB/$rel" "/system/$rel" 2>/dev/null || true
+    done
+else
+    for f in "$SYSLIB"/lib64/*.so; do
+        name=$(basename "$f")
+        target="/system/lib64/$name"
+        [ -f "$target" ] && mount --bind "$f" "$target" 2>/dev/null || true
+    done
+    for f in "$SYSLIB"/lib/*.so; do
+        name=$(basename "$f")
+        target="/system/lib/$name"
+        [ -f "$target" ] && mount --bind "$f" "$target" 2>/dev/null || true
+    done
+fi
 # These exist in our build but have no same-named counterpart on the factory partition at
 # all, so the by-name bind-mount loop above never touches them -- create the mountpoint
 # instead. libdexfile_support.so: needed by our libunwindstack.so.
