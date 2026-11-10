@@ -1,0 +1,74 @@
+diff --git a/hwcomposer/hwcomposer.pro b/hwcomposer/hwcomposer.pro
+index 0885ee2..3711c51 100644
+--- a/hwcomposer/hwcomposer.pro
++++ b/hwcomposer/hwcomposer.pro
+@@ -10,8 +10,8 @@ DEPENDPATH += .
+ 
+ SOURCES += main.cpp
+ 
+-SOURCES += hwcomposer_context.cpp
+-HEADERS += hwcomposer_context.h
++SOURCES += hwcomposer_context.cpp nightlight.cpp
++HEADERS += hwcomposer_context.h nightlight.h
+ 
+ SOURCES += hwcomposer_screeninfo.cpp
+ HEADERS += hwcomposer_screeninfo.h
+diff --git a/hwcomposer/hwcomposer_context.cpp b/hwcomposer/hwcomposer_context.cpp
+index 95ab47f..aa1b968 100644
+--- a/hwcomposer/hwcomposer_context.cpp
++++ b/hwcomposer/hwcomposer_context.cpp
+@@ -49,14 +49,17 @@
+ #include "qeglfscontext.h"
+ #include "hwcomposer_screeninfo.h"
+ #include "hwcomposer_backend.h"
++#include "nightlight.h"
+ 
+ #include <qcoreapplication.h>
++#include <QOpenGLContext>
+ 
+ QT_BEGIN_NAMESPACE
+ 
+ HwComposerContext::HwComposerContext()
+     : info(NULL)
+     , backend(NULL)
++    , nightLight(new NightLight)
+     , display_off(false)
+     , window_created(false)
+     , fps(0)
+@@ -77,6 +80,7 @@ HwComposerContext::~HwComposerContext()
+ 
+     // Free framebuffer device parameters info
+     delete info;
++    delete nightLight;
+ }
+ 
+ EGLNativeDisplayType HwComposerContext::platformDisplay() const
+@@ -144,6 +148,8 @@ void HwComposerContext::swapToWindow(QEglFSContext *context, QPlatformSurface *s
+ 
+     EGLDisplay egl_display = context->eglDisplay();
+     EGLSurface egl_surface = context->eglSurfaceForPlatformSurface(surface);
++    if (nightLight->active())
++        nightLight->apply(QOpenGLContext::currentContext());
+     return backend->swap(egl_display, egl_surface);
+ }
+ 
+diff --git a/hwcomposer/hwcomposer_context.h b/hwcomposer/hwcomposer_context.h
+index 68934a4..76faa18 100644
+--- a/hwcomposer/hwcomposer_context.h
++++ b/hwcomposer/hwcomposer_context.h
+@@ -69,6 +69,7 @@ class QEglFSContext;
+ class QEglFSWindow;
+ class HwComposerScreenInfo;
+ class HwComposerBackend;
++class NightLight;
+ 
+ class HwComposerContext
+ {
+@@ -96,6 +97,7 @@ public:
+ private:
+     HwComposerScreenInfo *info;
+     HwComposerBackend *backend;
++    NightLight *nightLight;
+     bool display_off;
+     bool window_created;
+     qreal fps;

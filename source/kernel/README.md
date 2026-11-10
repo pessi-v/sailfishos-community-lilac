@@ -1,6 +1,6 @@
 # Kernel source
 
-The kernel in `hybris-boot.img` (Linux 4.14.264, version string `4.14.264-g8db245937d42-dirty`, build `#8 SMP PREEMPT Wed Oct 14 13:11:15 UTC 2026`) is
+The kernel in `hybris-boot.img` (Linux 4.14.264, version string `4.14.264-g8db245937d42-dirty`, build `#1 SMP PREEMPT Fri Nov 6 15:56:36 UTC 2026`) is
 built from:
 
 - upstream: <https://github.com/mer-hybris/android_kernel_sony_msm>, branch `hybris-sony-aosp/LA.UM.7.1.r1`, commit
@@ -10,7 +10,7 @@ built from:
 
 What the changes are, in short: UFS device-detection retry and reference-clock handling, a Bluetooth advertising-report fix, camera flash driving both LED
 strings, no spurious 0 % battery capacity from the fuel gauge, modem (MSS) bring-up clock and reset ordering, a light-sensor time fix, ION legacy
-interface for the Android HAL, device-tree changes for the lilac, and defconfig options (for example Bluetooth RFCOMM/BNEP/HIDP). The exact changes are in the diff.
+interface for the Android HAL, device-tree changes for the lilac, and defconfig options (for example Bluetooth RFCOMM/BNEP/HIDP, and run-queue statistics, which the interrupt balancer of the vendor blobs needs). The exact changes are in the diff.
 
 ## Rebuild
 

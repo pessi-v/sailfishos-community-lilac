@@ -1,4 +1,4 @@
-# Corresponding source for the community image (Xperia XZ1 Compact, release 1.2)
+# Corresponding source for the community image (Xperia XZ1 Compact, release 1.3)
 
 The images in the release contain software under the GNU GPL, LGPL and other licences. This directory holds, or points to, the source
 for the parts that were built or changed, and says where the source of everything else comes from. Sony's proprietary binaries are
@@ -20,7 +20,7 @@ The 34 locally built packages: `droid-config-lilac*` and `patterns-sailfish-devi
 `qt5-qpa-hwcomposer-plugin` (LGPLv2 with exception or GPLv3 or Qt Commercial). All except the ones in `droid-configs/` are builds of the upstream
 projects named in the manifest, plus the changes in `android-hybris/as-built/`.
 
-[`patches/`](patches/) holds the scripts used to apply changes to the upstream trees. The results of those scripts are the diffs; the
+[`patches/`](patches/) holds the scripts used to apply changes to the upstream trees, and `patches/hwcomposer-nightlight/`, a change to the display plugin that lets a night light tint the screen. The results of those scripts are the diffs; the
 scripts show how and why.
 
 ## What this snapshot is, exactly
