@@ -1,0 +1,33 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: pessi-v <pessimo@posteo.net>
+Date: Sun, 15 Nov 2026 16:38:50 +0000
+Subject: [PATCH] (lilac) tcs3490: build with a scalar ktime_t
+
+The driver reads ktime_t.tv64, which no longer exists; ktime_t is a
+plain s64 in this kernel.
+---
+ drivers/misc/tcs3490.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/misc/tcs3490.c b/drivers/misc/tcs3490.c
+index ccb2f0f66d4e0dc67d262078c09ea1c545145982..e0232554502d08d6b3ad958dd5ae48eaf881ae41 100644
+--- a/drivers/misc/tcs3490.c
++++ b/drivers/misc/tcs3490.c
+@@ -601,7 +601,7 @@ static void tcs3490_get_als_setup_next(struct tcs3490_chip *chip)
+ 			mutex_unlock(&chip->lock);
+ 		}
+ 		cur_ktime = ktime_get();
+-		chip->als_inf.timestamp = (uint64_t)cur_ktime.tv64;
++		chip->als_inf.timestamp = (uint64_t)cur_ktime;
+ 		dev_dbg(&chip->client->dev,
+ 			"%s: Changed channel from RGBC-IR to 0x%x Time %llu\n",
+ 			__func__, chip->als_channel, chip->als_inf.timestamp);
+@@ -626,7 +626,7 @@ static void tcs3490_get_als_setup_next(struct tcs3490_chip *chip)
+ 			le16_to_cpup((const __le16 *)&buf[6]);
+ 		mutex_unlock(&chip->lock);
+ 		cur_ktime = ktime_get();
+-		chip->als_inf.timestamp = (uint64_t)cur_ktime.tv64;
++		chip->als_inf.timestamp = (uint64_t)cur_ktime;
+ 	}
+ 
+ 	sat = min_t(u32, MAX_ALS_VALUE,

@@ -1,0 +1,54 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: pessi-v <pessimo@posteo.net>
+Date: Sun, 15 Nov 2026 16:38:56 +0000
+Subject: [PATCH] (lilac) msm_flash: drive both LED strings
+
+The flash LED of this phone is wired across both PMI8998 flash strings.
+The camera HAL only sets the current of the first string, and the PMIC
+then reports "led short/open fault" and switches the flash off. When
+only the first current is set, use it for both strings.
+---
+ .../msm/camera_v2/sensor/flash/msm_flash.c         |   16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
+
+diff --git a/drivers/media/platform/msm/camera_v2/sensor/flash/msm_flash.c b/drivers/media/platform/msm/camera_v2/sensor/flash/msm_flash.c
+index 703df3e6ed1d6709b9aeefc46688785d43fd2556..16dae115c378dfabce647e042c1dc19948720b1c 100644
+--- a/drivers/media/platform/msm/camera_v2/sensor/flash/msm_flash.c
++++ b/drivers/media/platform/msm/camera_v2/sensor/flash/msm_flash.c
+@@ -747,6 +747,18 @@ static int32_t msm_flash_prepare(
+ 	return ret;
+ }
+ 
++/* lilac: the flash LED is wired across both strings and faults if only one carries
++ * current; the generic HAL fills flash_current[0] only (the other slots are 0 or garbage).
++ * Use string 0's request for every string. */
++static void msm_flash_mirror_first_string(int32_t *flash_current,
++	uint32_t num_sources)
++{
++	uint32_t i;
++
++	for (i = 1; i < num_sources && i < MAX_LED_TRIGGERS; i++)
++		flash_current[i] = flash_current[0];
++}
++
+ static int32_t msm_flash_low(
+ 	struct msm_flash_ctrl_t *flash_ctrl,
+ 	struct msm_flash_cfg_data_t *flash_data)
+@@ -755,6 +767,8 @@ static int32_t msm_flash_low(
+ 	int32_t i = 0;
+ 
+ 	CDBG("Enter\n");
++	msm_flash_mirror_first_string(flash_data->flash_current,
++		flash_ctrl->torch_num_sources);
+ 	/* Turn off flash triggers */
+ 	for (i = 0; i < flash_ctrl->flash_num_sources; i++)
+ 		if (flash_ctrl->flash_trigger[i])
+@@ -792,6 +806,8 @@ static int32_t msm_flash_high(
+ 	int32_t max_current = 0;
+ 	int32_t i = 0;
+ 
++	msm_flash_mirror_first_string(flash_data->flash_current,
++		flash_ctrl->flash_num_sources);
+ 	/* Turn off torch triggers */
+ 	for (i = 0; i < flash_ctrl->torch_num_sources; i++)
+ 		if (flash_ctrl->torch_trigger[i])

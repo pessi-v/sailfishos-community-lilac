@@ -1,0 +1,29 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: pessi-v <pessimo@posteo.net>
+Date: Sun, 15 Nov 2026 16:38:04 +0000
+Subject: [PATCH] (lilac) dts: venus: drop the unresolvable smmu-vdd supply
+
+msm_vidc's smmu-vdd-supply points at gdsc_bimc_smmu, which is disabled
+on this board, so regulator lookup fails and enabling the regulators
+dereferences NULL during boot. Without the property the driver gets a
+dummy regulator and video encode/decode work.
+---
+ arch/arm64/boot/dts/qcom/msm8998-vidc.dtsi |    5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm64/boot/dts/qcom/msm8998-vidc.dtsi b/arch/arm64/boot/dts/qcom/msm8998-vidc.dtsi
+index b8d6134a96bb7aaec19caa709d696ca192cdf9a3..cd419649a365de6afd503f6a242f362bb36d9aec 100644
+--- a/arch/arm64/boot/dts/qcom/msm8998-vidc.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8998-vidc.dtsi
+@@ -72,7 +72,10 @@
+ 			<465000000 8490000>; /* imem @ turbo freq 406 Mhz */
+ 
+ 		/* Regulators */
+-		smmu-vdd-supply = <&gdsc_bimc_smmu>;
++		/* lilac: no smmu-vdd-supply. gdsc_bimc_smmu is status="disabled" here as it
++		 * is on 4.4, and naming an unregistered provider makes this kernel return
++		 * -EPROBE_DEFER where 4.4 fell back to a dummy. Omitting it gives -ENODEV
++		 * -> dummy, i.e. exactly the rail Venus has always had on 4.4. */
+ 		venus-supply = <&gdsc_venus>;
+ 		venus-core0-supply = <&gdsc_venus_core0>;
+ 		venus-core1-supply = <&gdsc_venus_core1>;

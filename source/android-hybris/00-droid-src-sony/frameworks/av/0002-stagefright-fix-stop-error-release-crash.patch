@@ -1,0 +1,109 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Wonsik Kim <wonsik@google.com>
+Date: Thu, 25 Feb 2021 10:49:09 -0800
+Subject: [PATCH] stagefright: fix stop-error-release crash
+
+Bug: 181194470
+Test: atest mediacodecTest
+Change-Id: I1e72d04457c1777b2b5346efa082d15546a5f14d
+---
+ media/libstagefright/MediaCodec.cpp           | 11 +++++--
+ .../tests/mediacodec/MediaCodecTest.cpp       | 29 ++++++++-----------
+ 2 files changed, 20 insertions(+), 20 deletions(-)
+
+diff --git a/media/libstagefright/MediaCodec.cpp b/media/libstagefright/MediaCodec.cpp
+index 553f59a41f7b7ed31aa10f88d90248cdc1f7912b..740cc4d8d91fd6aef44eed5292b536b9879aac99 100644
+--- a/media/libstagefright/MediaCodec.cpp
++++ b/media/libstagefright/MediaCodec.cpp
+@@ -3112,16 +3112,21 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
+                 break;
+             }
+ 
+-            // If we're flushing, stopping, configuring or starting  but
++            // If we're flushing, configuring or starting  but
+             // received a release request, post the reply for the pending call
+             // first, and consider it done. The reply token will be replaced
+             // after this, and we'll no longer be able to reply.
+-            if (mState == FLUSHING || mState == STOPPING
+-                    || mState == CONFIGURING || mState == STARTING) {
++            if (mState == FLUSHING || mState == CONFIGURING || mState == STARTING) {
+                 // mReply is always set if in these states.
+                 postPendingRepliesAndDeferredMessages(
+                         std::string("kWhatRelease:") + stateString(mState));
+             }
++            // If we're stopping but received a release request, post the reply
++            // for the pending call if necessary. Note that the reply may have been
++            // already posted due to an error.
++            if (mState == STOPPING && mReplyID) {
++                postPendingRepliesAndDeferredMessages("kWhatRelease:STOPPING");
++            }
+ 
+             if (mFlags & kFlagSawMediaServerDie) {
+                 // It's dead, Jim. Don't expect initiateShutdown to yield
+diff --git a/media/libstagefright/tests/mediacodec/MediaCodecTest.cpp b/media/libstagefright/tests/mediacodec/MediaCodecTest.cpp
+index d00a50ff0543fcf0de7175a6c0641f722e2b7d83..6facbd86742c7e56c6fa1fd2ca01a9776265bdf7 100644
+--- a/media/libstagefright/tests/mediacodec/MediaCodecTest.cpp
++++ b/media/libstagefright/tests/mediacodec/MediaCodecTest.cpp
+@@ -286,16 +286,18 @@ TEST(MediaCodecTest, ErrorWhileStopping) {
+     //    initiateShutdown(); shutdown is being handled at the component thread.
+     // 2) Error occurred, but the shutdown operation is still being done.
+     // 3) MediaCodec looper thread handles the error.
+-    // 4) Component thread completes shutdown and posts onStopCompleted()
++    // 4) Client releases the codec upon the error; previous shutdown is still
++    //    going on.
++    // 5) Component thread completes shutdown and posts onStopCompleted();
++    //    Shutdown from release also completes.
+ 
+     static const AString kCodecName{"test.codec"};
+     static const AString kCodecOwner{"nobody"};
+     static const AString kMediaType{"video/x-test"};
+ 
+-    std::promise<void> errorOccurred;
+     sp<MockCodec> mockCodec;
+     std::function<sp<CodecBase>(const AString &name, const char *owner)> getCodecBase =
+-        [&mockCodec, &errorOccurred](const AString &, const char *) {
++        [&mockCodec](const AString &, const char *) {
+             mockCodec = new MockCodec([](const std::shared_ptr<MockBufferChannel> &) {
+                 // No mock setup, as we don't expect any buffer operations
+                 // in this scenario.
+@@ -314,13 +316,14 @@ TEST(MediaCodecTest, ErrorWhileStopping) {
+                     mockCodec->callback()->onStartCompleted();
+                 });
+             ON_CALL(*mockCodec, initiateShutdown(true))
+-                .WillByDefault([mockCodec, &errorOccurred](bool) {
++                .WillByDefault([mockCodec](bool) {
+                     mockCodec->callback()->onError(UNKNOWN_ERROR, ACTION_CODE_FATAL);
+-                    // Mark that 1) and 2) are complete.
+-                    errorOccurred.set_value();
+                 });
+             ON_CALL(*mockCodec, initiateShutdown(false))
+                 .WillByDefault([mockCodec](bool) {
++                    // Previous stop finished now.
++                    mockCodec->callback()->onStopCompleted();
++                    // Release also finished.
+                     mockCodec->callback()->onReleaseCompleted();
+                 });
+             return mockCodec;
+@@ -332,19 +335,11 @@ TEST(MediaCodecTest, ErrorWhileStopping) {
+     ASSERT_NE(nullptr, codec) << "Codec must not be null";
+     ASSERT_NE(nullptr, mockCodec) << "MockCodec must not be null";
+ 
+-    std::thread([mockCodec, &errorOccurred]{
+-        // Simulate component thread that handles stop()
+-        errorOccurred.get_future().wait();
+-        // Error occurred but shutdown request still got processed.
+-        mockCodec->callback()->onStopCompleted();
+-    }).detach();
+-
+     codec->configure(new AMessage, nullptr, nullptr, 0);
+     codec->start();
+-    codec->stop();
+-    // Sleep here to give time for the MediaCodec looper thread
+-    // to process the messages.
+-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
++    // stop() will fail because of the error
++    EXPECT_NE(OK, codec->stop());
++    // upon receiving the error, client tries to release the codec.
+     codec->release();
+     looper->stop();
+ }

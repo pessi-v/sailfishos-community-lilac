@@ -1,0 +1,39 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: pessi-v <pessimo@posteo.net>
+Date: Sun, 15 Nov 2026 16:38:26 +0000
+Subject: [PATCH] (lilac) drm: treat rotation 0 as DRM_MODE_ROTATE_0
+
+The msm8998 display stack from Android 9 sets the plane rotation
+property to 0 to mean "no rotation". 4.14 requires exactly one rotation
+bit and fails the whole atomic commit with EINVAL, so nothing was ever
+shown. Read "no rotation bits" as ROTATE_0; values with several rotation
+bits are still refused.
+---
+ drivers/gpu/drm/drm_atomic.c |   14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
+
+diff --git a/drivers/gpu/drm/drm_atomic.c b/drivers/gpu/drm/drm_atomic.c
+index a87ead3c5c20938a341d438e03ab47e0b2d34f35..5e0cb0f9441d7432e423e4cb0e93fc3b8529d389 100644
+--- a/drivers/gpu/drm/drm_atomic.c
++++ b/drivers/gpu/drm/drm_atomic.c
+@@ -764,6 +764,20 @@ static int drm_atomic_plane_set_property(struct drm_plane *plane,
+ 	} else if (property == config->prop_src_h) {
+ 		state->src_h = val;
+ 	} else if (property == plane->rotation_property) {
++		/*
++		 * lilac: msm8998's Android 9 SDM sends rotation=0 to
++		 * mean "no rotation". The ABI spells that DRM_MODE_ROTATE_0
++		 * (== 1) and wants exactly one rotate bit, so is_power_of_2(0)
++		 * refuses it and the whole atomic commit fails EINVAL -- which
++		 * is why the display was never programmed at all.
++		 *
++		 * 4.4, which these blobs were built against, had no check here
++		 * and simply stored the value, so the distinction was never
++		 * forced on them. Read "no bits" as ROTATE_0, which is what the
++		 * caller means; ambiguous multi-bit values are still refused.
++		 */
++		if (!(val & DRM_MODE_ROTATE_MASK))
++			val |= DRM_MODE_ROTATE_0;
+ 		if (!is_power_of_2(val & DRM_MODE_ROTATE_MASK))
+ 			return -EINVAL;
+ 		state->rotation = val;

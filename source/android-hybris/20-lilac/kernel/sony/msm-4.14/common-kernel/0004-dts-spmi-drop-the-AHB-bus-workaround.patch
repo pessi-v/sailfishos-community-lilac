@@ -1,0 +1,25 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: pessi-v <pessimo@posteo.net>
+Date: Sun, 15 Nov 2026 16:38:09 +0000
+Subject: [PATCH] (lilac) dts: spmi: drop the AHB bus workaround
+
+With qcom,enable-ahb-bus-workaround, pmic_arb_base_write() reads a
+register outside the cnfg mapping on this PMIC arbiter version and the
+kernel panics in qpnp_pon 0.3 s into boot.
+---
+ arch/arm64/boot/dts/qcom/msm8998.dtsi |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm64/boot/dts/qcom/msm8998.dtsi b/arch/arm64/boot/dts/qcom/msm8998.dtsi
+index a4825bc5543f2ce3f643e24e735656668916b285..0a016a21595a8553e72e503568b3c60f0fe22a42 100644
+--- a/arch/arm64/boot/dts/qcom/msm8998.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8998.dtsi
+@@ -638,7 +638,7 @@
+ 		interrupt-controller;
+ 		#interrupt-cells = <4>;
+ 		cell-index = <0>;
+-		qcom,enable-ahb-bus-workaround;
++		/* lilac: AHB workaround removed -- reads cnfg+0x6000 outside the 0x3000 cnfg mapping and panics at qpnp_pon probe */
+ 	};
+ 
+ 	qcom,sps {

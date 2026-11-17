@@ -1,6 +1,6 @@
 # Kernel source
 
-The kernel in `hybris-boot.img` (Linux 4.14.264, version string `4.14.264-g8db245937d42-dirty`, build `#1 SMP PREEMPT Fri Nov 6 15:56:36 UTC 2026`) is
+The kernel in `hybris-boot.img` (Linux 4.14.264, version string `4.14.264-g992d314fe6cf`, build `#1 SMP PREEMPT Sun Nov 15 18:29:31 UTC 2026`) is
 built from:
 
 - upstream: <https://github.com/mer-hybris/android_kernel_sony_msm>, branch `hybris-sony-aosp/LA.UM.7.1.r1`, commit
@@ -10,7 +10,8 @@ built from:
 
 What the changes are, in short: UFS device-detection retry and reference-clock handling, a Bluetooth advertising-report fix, camera flash driving both LED
 strings, no spurious 0 % battery capacity from the fuel gauge, modem (MSS) bring-up clock and reset ordering, a light-sensor time fix, ION legacy
-interface for the Android HAL, device-tree changes for the lilac, and defconfig options (for example Bluetooth RFCOMM/BNEP/HIDP, and run-queue statistics, which the interrupt balancer of the vendor blobs needs). The exact changes are in the diff.
+interface for the Android HAL, device-tree changes for the lilac, and defconfig options (for example Bluetooth RFCOMM/BNEP/HIDP, and run-queue statistics, which the interrupt balancer of the vendor blobs needs). The exact changes are in the diff. The same changes, one commit each, are the kernel patches in
+[`../android-hybris/20-lilac/kernel/sony/msm-4.14/common-kernel/`](../android-hybris/20-lilac/kernel/sony/msm-4.14/common-kernel/).
 
 ## Rebuild
 
@@ -29,7 +30,7 @@ make $ARGS -j4 Image.gz-dtb          # result: arch/arm64/boot/Image.gz-dtb
 `CROSS_COMPILE_ARM32` is required (the compat vDSO does not build without it). The resulting `.config` equals [`lilac-shipped.config`](lilac-shipped.config) (compare
 the sorted lines that do not start with `#`; no difference was found when this was checked).
 
-The shipped kernel image is `Image.gz-dtb`, 13,859,236 bytes, md5 `9b4b955fb703af4d3b6b467fb8e5753e`. A rebuild will not match byte for byte (timestamp and host
+The shipped kernel image is `Image.gz-dtb`, 13,858,448 bytes, md5 `d7e0df1d33e57c6c36b6cf0e44e06fd9`. A rebuild will not match byte for byte (timestamp and host
 name are embedded), but the sources and configuration are the same.
 
 The boot image that wraps this kernel is described in [`../boot-image/README.md`](../boot-image/README.md).

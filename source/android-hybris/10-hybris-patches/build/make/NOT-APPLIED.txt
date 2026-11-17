@@ -1,0 +1,4 @@
+0001-hybris-Reduce-vendorimage-build-size.patch is kept for reference but not applied: it removes the
+build-vendorimage-target recipe, so "m vendorimage" no longer produces vendor.img. Upstream hybris
+adaptations keep the stock vendor partition; this adaptation mounts its own vendor.img (built from
+this tree) as /vendor, so it needs the image.

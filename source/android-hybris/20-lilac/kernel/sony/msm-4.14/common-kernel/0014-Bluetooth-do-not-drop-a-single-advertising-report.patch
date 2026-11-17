@@ -1,0 +1,31 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: pessi-v <pessimo@posteo.net>
+Date: Sun, 15 Nov 2026 16:39:09 +0000
+Subject: [PATCH] (lilac) Bluetooth: do not drop a single advertising report that fills the event
+
+hci_le_adv_report_evt() checks after every report that another report
+header still fits. After the last report that check is wrong: a single
+report that exactly fills the event leaves ptr at the tail and is
+dropped as "Malicious advertising data". Only check when another report
+follows; the while loop ends the parsing otherwise.
+
+With this, BLE devices that send full-length advertising reports are
+found in scans.
+---
+
+diff --git a/net/bluetooth/hci_event.c b/net/bluetooth/hci_event.c
+index eca596a56f46b412ba796fb13188d732f8249b2d..b4243a6d5b987620549006c878c271735b958f4d 100644
+@@ -4979,7 +4979,12 @@
+ 
+ 		ptr += sizeof(*ev) + ev->length + 1;
+ 
+-		if (ptr > (void *) skb_tail_pointer(skb) - sizeof(*ev)) {
++		/* Only check for room for another report header when another
++		 * report follows. A single report that exactly fills the
++		 * event is valid and must not be dropped as malicious.
++		 */
++		if (num_reports &&
++		    ptr > (void *) skb_tail_pointer(skb) - sizeof(*ev)) {
+ 			bt_dev_err(hdev, "Malicious advertising data. Stopping processing");
+ 			break;
+ 		}

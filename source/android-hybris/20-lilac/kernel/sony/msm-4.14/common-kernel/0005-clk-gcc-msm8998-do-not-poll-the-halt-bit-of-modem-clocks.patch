@@ -1,0 +1,34 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: pessi-v <pessimo@posteo.net>
+Date: Sun, 15 Nov 2026 16:38:15 +0000
+Subject: [PATCH] (lilac) clk: gcc-msm8998: do not poll the halt bit of two modem clocks
+
+gcc_mss_q6_bimc_axi_clk and gcc_mss_cfg_ahb_clk are enabled while the
+modem subsystem is still powered down, so their halt status stays
+"off" and the clock framework reports failure: first the whole GCC
+probe failed, then the modem PIL load. Mark both BRANCH_HALT_SKIP.
+---
+ drivers/clk/qcom/gcc-msm8998.c |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/clk/qcom/gcc-msm8998.c b/drivers/clk/qcom/gcc-msm8998.c
+index 9a4bf3c18d8f4fff5d4c4ea23014d5b61750c61b..a7f940182e5314aa3fd8107af7d563aaf3c0b1fa 100644
+--- a/drivers/clk/qcom/gcc-msm8998.c
++++ b/drivers/clk/qcom/gcc-msm8998.c
+@@ -2676,7 +2676,7 @@ static struct clk_branch gcc_usb_phy_cfg_ahb2phy_clk = {
+ 
+ static struct clk_branch gcc_mss_cfg_ahb_clk = {
+ 	.halt_reg = 0x8A000,
+-	.halt_check = BRANCH_HALT,
++	.halt_check = BRANCH_HALT_SKIP, /* lilac: skip halt poll -- modem off during PIL MBA load */
+ 	.hwcg_reg = 0x8a000,
+ 	.hwcg_bit = 1,
+ 	.clkr = {
+@@ -2691,6 +2691,7 @@ static struct clk_branch gcc_mss_cfg_ahb_clk = {
+ 
+ static struct clk_branch gcc_mss_q6_bimc_axi_clk = {
+ 	.halt_reg = 0x8A040,
++	.halt_check = BRANCH_HALT_SKIP, /* lilac: skip halt poll -- modem off at GCC probe, was aborting the whole controller */
+ 	.clkr = {
+ 		.enable_reg = 0x8A040,
+ 		.enable_mask = BIT(0),

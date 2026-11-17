@@ -114,6 +114,14 @@ Requires: nfcd-binder-plugin
 # ofono-configs-binder, droid-config-lilac already obsoletes it.
 Requires: ofono-binder-plugin
 
+# Android's netd does not run (ConnMan owns routing and the firewall); dummy_netd registers the
+# netd binder service that Android components look up.
+Requires: dummy_netd
+
+# Configures wake-on-WLAN, so that suspend does not disconnect from the access point (the
+# disconnect's wakelock would otherwise abort every suspend while Wi-Fi is on).
+Requires: sailfish-connman-plugin-suspend
+
 %description -n patterns-sailfish-device-adaptation-lilac
 Pattern with packages for lilac HW Adaptation
 

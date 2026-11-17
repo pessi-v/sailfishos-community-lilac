@@ -1,0 +1,24 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: pessi-v <pessimo@posteo.net>
+Date: Sun, 15 Nov 2026 16:30:30 +0000
+Subject: [PATCH] (hybris) composer 2.3 service: declare the HIDL interfaces it serves
+
+Without "interface" lines droid-hal-init does not know which service
+provides android.hardware.graphics.composer@2.x::IComposer/default, so
+hwservicemanager cannot start it on demand and clients wait forever.
+---
+ .../2.3/default/android.hardware.graphics.composer@2.3-service.rc      | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/graphics/composer/2.3/default/android.hardware.graphics.composer@2.3-service.rc b/graphics/composer/2.3/default/android.hardware.graphics.composer@2.3-service.rc
+index 81ce89059cf692daa0a30f14f1e4eab9021e5ad5..7bdee9a4355057624a940dfc12105b8608b1b3b3 100644
+--- a/graphics/composer/2.3/default/android.hardware.graphics.composer@2.3-service.rc
++++ b/graphics/composer/2.3/default/android.hardware.graphics.composer@2.3-service.rc
+@@ -1,4 +1,7 @@
+ service vendor.hwcomposer-2-3 /vendor/bin/hw/android.hardware.graphics.composer@2.3-service
++    interface android.hardware.graphics.composer@2.1::IComposer default
++    interface android.hardware.graphics.composer@2.2::IComposer default
++    interface android.hardware.graphics.composer@2.3::IComposer default
+     class hal animation
+     user system
+     group graphics drmrpc

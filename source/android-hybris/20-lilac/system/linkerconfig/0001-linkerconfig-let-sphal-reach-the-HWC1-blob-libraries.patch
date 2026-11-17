@@ -1,0 +1,63 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: pessi-v <pessimo@posteo.net>
+Date: Sun, 15 Nov 2026 16:31:43 +0000
+Subject: [PATCH] (hybris) linkerconfig: let sphal reach the libraries of the HWC1 blob
+
+lipstick loads hwcomposer.msm8998.so through libhybris into the sphal
+namespace. That vendor blob is a pre-Treble HWC1 module with direct
+NEEDED entries on libbinder, libhardware, libhardware_legacy,
+libutils, libcutils, libsync, libc++ and libui, which sphal does not
+link to the system namespace, so the load fails and lipstick aborts.
+Add exactly these libraries to the sphal -> system link, in both
+branches of BuildSphalNamespace().
+---
+ contents/namespace/sphal.cc |   29 +++++++++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
+
+diff --git a/contents/namespace/sphal.cc b/contents/namespace/sphal.cc
+index e97197f3492550205afaf221800504445af9ea61..25b6fecc21f58186ef1afcda1661a0e5afe9e8e9 100644
+--- a/contents/namespace/sphal.cc
++++ b/contents/namespace/sphal.cc
+@@ -60,6 +60,21 @@ Namespace BuildSphalNamespace([[maybe_unused]] const Context& ctx) {
+           Var("VNDK_SAMEPROCESS_LIBRARIES_VENDOR", ""));
+       ns.GetLink(ctx.GetSystemNamespaceName())
+           .AddSharedLib(Var("LLNDK_LIBRARIES_VENDOR", ""));
++      // lilac: hwcomposer.msm8998.so is a pre-Treble HWC1 blob that
++      // directly needs libbinder.so, which is never in LLNDK/VNDK-SP on purpose --
++      // widened narrowly (one named library) so lipstick can load it via libhybris.
++      ns.GetLink(ctx.GetSystemNamespaceName()).AddSharedLib("libbinder.so");
++      // lilac: libhardware.so/libhardware_legacy.so, same reasoning as libbinder.so above
++      // both are genuine NEEDED entries of the same blob,
++      // surfaced only once libbinder.so itself stopped being the first failure.
++      ns.GetLink(ctx.GetSystemNamespaceName()).AddSharedLib("libhardware.so");
++      ns.GetLink(ctx.GetSystemNamespaceName()).AddSharedLib("libhardware_legacy.so");
++      // lilac: libutils.so/libcutils.so/libsync.so/libc++.so/libui.so, same reasoning as libbinder.so/libhardware.so above
++      ns.GetLink(ctx.GetSystemNamespaceName()).AddSharedLib("libutils.so");
++      ns.GetLink(ctx.GetSystemNamespaceName()).AddSharedLib("libcutils.so");
++      ns.GetLink(ctx.GetSystemNamespaceName()).AddSharedLib("libsync.so");
++      ns.GetLink(ctx.GetSystemNamespaceName()).AddSharedLib("libc++.so");
++      ns.GetLink(ctx.GetSystemNamespaceName()).AddSharedLib("libui.so");
+     }
+   } else {
+     // Once in this namespace, access to libraries in /system/lib is restricted.
+@@ -71,6 +86,20 @@ Namespace BuildSphalNamespace([[maybe_unused]] const Context& ctx) {
+     }
+     ns.GetLink(ctx.GetSystemNamespaceName())
+         .AddSharedLib(Var("LLNDK_LIBRARIES_VENDOR", ""));
++    // lilac: hwcomposer.msm8998.so is a pre-Treble HWC1 blob, same widening as above, in whichever branch
++    // actually governs a foreign (non-/system, non-/vendor) binary like lipstick.
++    ns.GetLink(ctx.GetSystemNamespaceName()).AddSharedLib("libbinder.so");
++    // lilac: libhardware.so/libhardware_legacy.so, same reasoning as libbinder.so above
++    // both are genuine NEEDED entries of the same blob,
++    // surfaced only once libbinder.so itself stopped being the first failure.
++    ns.GetLink(ctx.GetSystemNamespaceName()).AddSharedLib("libhardware.so");
++    ns.GetLink(ctx.GetSystemNamespaceName()).AddSharedLib("libhardware_legacy.so");
++    // lilac: libutils.so/libcutils.so/libsync.so/libc++.so/libui.so, same reasoning as libbinder.so/libhardware.so above
++    ns.GetLink(ctx.GetSystemNamespaceName()).AddSharedLib("libutils.so");
++    ns.GetLink(ctx.GetSystemNamespaceName()).AddSharedLib("libcutils.so");
++    ns.GetLink(ctx.GetSystemNamespaceName()).AddSharedLib("libsync.so");
++    ns.GetLink(ctx.GetSystemNamespaceName()).AddSharedLib("libc++.so");
++    ns.GetLink(ctx.GetSystemNamespaceName()).AddSharedLib("libui.so");
+     ns.GetLink("vndk").AddSharedLib(
+         Var("VNDK_SAMEPROCESS_LIBRARIES_VENDOR", ""));
+     ns.AddRequires(std::vector{"libneuralnetworks.so"});

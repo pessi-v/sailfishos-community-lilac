@@ -1,0 +1,45 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Simonas Leleiva <simonas.leleiva@meramo.co.uk>
+Date: Sun, 30 Oct 2016 14:07:11 +0000
+Subject: [PATCH] (hybris) AudioService is disabled in hybris adaptations
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Without this patch, camera is waiting for AudioService indefinitely
+
+Change-Id: Id572746cc77c8d26e3a8e7fc1dc05b17ac282ed4
+Signed-off-by: Simonas Leleiva <simonas.leleiva@jolla.com>
+Signed-off-by: Björn Bidar <theodorstormgrade@gmail.com>
+---
+ services/camera/libcameraservice/CameraService.cpp | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/services/camera/libcameraservice/CameraService.cpp b/services/camera/libcameraservice/CameraService.cpp
+index e2fcb5a97cd254c5626d7b99cc8f8812cbffe92b..6bacf6e2af14c34da44fffd60d433d7a5cdf40e2 100644
+--- a/services/camera/libcameraservice/CameraService.cpp
++++ b/services/camera/libcameraservice/CameraService.cpp
+@@ -2685,9 +2685,15 @@ void CameraService::increaseSoundRef() {
+     mSoundRef++;
+ }
+ 
++#if defined(__clang__)
++#pragma clang diagnostic push
++#pragma clang diagnostic ignored "-Wunused-parameter"
++#endif
+ void CameraService::loadSoundLocked(sound_kind kind) {
+     ATRACE_CALL();
+ 
++#pragma clang diagnostic pop
++#ifdef DISABLED_FOR_HYBRIS_SUPPORT
+     LOG1("CameraService::loadSoundLocked ref=%d", mSoundRef);
+     if (SOUND_SHUTTER == kind && mSoundPlayer[SOUND_SHUTTER] == NULL) {
+         mSoundPlayer[SOUND_SHUTTER] = newMediaPlayer("/product/media/audio/ui/camera_click.ogg");
+@@ -2706,6 +2712,7 @@ void CameraService::loadSoundLocked(sound_kind kind) {
+             mSoundPlayer[SOUND_RECORDING_STOP] = newMediaPlayer("/system/media/audio/ui/VideoStop.ogg");
+         }
+     }
++#endif
+ }
+ 
+ void CameraService::decreaseSoundRef() {

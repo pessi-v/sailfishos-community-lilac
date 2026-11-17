@@ -1,0 +1,75 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: pessi-v <pessimo@posteo.net>
+Date: Sun, 15 Nov 2026 16:30:30 +0000
+Subject: [PATCH] (hybris) hwservicemanager: run without a loaded SELinux policy
+
+Same as the servicemanager change in frameworks/native: when no SELinux
+policy is loaded, skip the SELinux setup and allow every access check
+instead of aborting. With the current libselinux the constructor happens
+to survive a missing policy, so this is a safety net; hwservicemanager is
+critical, so an abort would end the boot.
+---
+ AccessControl.cpp | 15 +++++++++++++++
+ AccessControl.h   |  2 ++
+ 2 files changed, 17 insertions(+)
+
+diff --git a/AccessControl.cpp b/AccessControl.cpp
+index c8366ca65c0878bdddbe1159ffb3f94edb61c9f7..bacb3d5b63cd797dbf26b39699cf3f2587e0bee0 100644
+--- a/AccessControl.cpp
++++ b/AccessControl.cpp
+@@ -37,6 +37,18 @@ struct audit_data {
+ using android::FQName;
+ 
+ AccessControl::AccessControl() {
++    // hybris: no SELinux policy is loaded on this system. Aborting here is what would end
++    // the boot (this service is `critical` in its .rc). See patch header -- not currently
++    // triggered (both calls below happen to survive a missing policy on this build), kept
++    // as a defensive fallback rather than relied on.
++    mSeEnabled = (is_selinux_enabled() == 1);
++    if (!mSeEnabled) {
++        ALOGW("SELinux not enabled; hwservicemanager access control disabled");
++        mSeContext = nullptr;
++        mSeHandle = nullptr;
++        return;
++    }
++
+     mSeHandle = selinux_android_hw_service_context_handle();
+     LOG_ALWAYS_FATAL_IF(mSeHandle == nullptr, "Failed to acquire SELinux handle.");
+ 
+@@ -54,6 +66,7 @@ AccessControl::AccessControl() {
+ }
+ 
+ bool AccessControl::canAdd(const std::string& fqName, const CallingContext& callingContext) {
++    if (!mSeEnabled) return true;
+     FQName fqIface;
+ 
+     if (!FQName::parse(fqName, &fqIface)) {
+@@ -65,6 +78,7 @@ bool AccessControl::canAdd(const std::string& fqName, const CallingContext& call
+ }
+ 
+ bool AccessControl::canGet(const std::string& fqName, const CallingContext& callingContext) {
++    if (!mSeEnabled) return true;
+     FQName fqIface;
+ 
+     if (!FQName::parse(fqName, &fqIface)) {
+@@ -76,6 +90,7 @@ bool AccessControl::canGet(const std::string& fqName, const CallingContext& call
+ }
+ 
+ bool AccessControl::canList(const CallingContext& callingContext) {
++    if (!mSeEnabled) return true;
+     return checkPermission(callingContext, mSeContext, kPermissionList, nullptr);
+ }
+ 
+diff --git a/AccessControl.h b/AccessControl.h
+index 6462d28fd4697e4827119a6cfb6ca7f11fd429d5..ba50c01db4b68152f4009da35c0a69dc7fd01077 100644
+--- a/AccessControl.h
++++ b/AccessControl.h
+@@ -45,6 +45,8 @@ private:
+ 
+     static int auditCallback(void *data, security_class_t cls, char *buf, size_t len);
+ 
++    // hybris: false when no SELinux policy is loaded -> allow everything.
++    bool                   mSeEnabled;
+     char*                  mSeContext;
+     struct selabel_handle* mSeHandle;
+     union selinux_callback mSeCallbacks;

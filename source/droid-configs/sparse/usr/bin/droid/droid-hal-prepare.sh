@@ -766,22 +766,6 @@ if [ -f /usr/libexec/droid-lmkd-stub/lmkd ] && [ -f /system/bin/lmkd ]; then
     mount --bind /usr/libexec/droid-lmkd-stub/lmkd /system/bin/lmkd
 fi
 
-# 7. Real /system/etc/init/vold.rc (the factory partition's own, LineageOS/Sony-shipped
-#    file -- our own from-source build's vold.rc has no such line) sets
-#    `reboot_on_failure reboot,vold-failed`. vold does real Android FDE/FBE volume
-#    management this port has no use for (Sailfish mounts everything its own way, see
-#    droid-hal-prepare.sh's own step 1 and 5); it reliably fails here, same as
-#    lmkd/apexd already did (sections 16, 36/37), but `reboot_on_failure` turns THIS
-#    one's expected crash into init deliberately rebooting the entire device --
-#    confirmed directly in a live kmsg capture: "Reboot start, reason: reboot,vold-
-#    failed, reboot_target: vold-failed", ~130s into a boot that was otherwise
-#    progressing normally. Bind our own copy (identical
-#    except for that one line) over the real file so vold crash-loops harmlessly like
-#    logd/qseecomd/keymaster-3-0 already do, instead of taking the whole device down.
-if [ -f /usr/libexec/droid-vold-norebootfix/vold.rc ] && [ -f /system/etc/init/vold.rc ]; then
-    mount --bind /usr/libexec/droid-vold-norebootfix/vold.rc /system/etc/init/vold.rc
-fi
-
 # 7b. Real /system/etc/init/surfaceflinger.rc sets `onrestart restart zygote` -- real
 #     AOSP's own stock behaviour, since on real hardware a dead display server means no app
 #     can render anyway, so a crash is treated as catastrophic enough to nuke the whole app

@@ -1,0 +1,37 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: pessi-v <pessimo@posteo.net>
+Date: Sun, 15 Nov 2026 16:38:44 +0000
+Subject: [PATCH] (lilac) qpnp-fg-gen3: do not report capacity 0 after a failed read
+
+The fuel gauge's SRAM access sometimes times out on this board
+("wait for mem_grant timed out"), and the capacity read then returns 0
+or fails. Userspace takes 0 % as an empty battery and starts an
+emergency shutdown. When the read fails, or returns 0 while the battery
+voltage is more than 250 mV above the cutoff voltage, report the last
+known capacity instead.
+---
+ drivers/power/supply/qcom/qpnp-fg-gen3.c |   11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/drivers/power/supply/qcom/qpnp-fg-gen3.c b/drivers/power/supply/qcom/qpnp-fg-gen3.c
+index afe0c8ed0bf855eedb008ee293db3df1986adc56..039c1d4783c4c2766d5c2eef743e5861201ad730 100644
+--- a/drivers/power/supply/qcom/qpnp-fg-gen3.c
++++ b/drivers/power/supply/qcom/qpnp-fg-gen3.c
+@@ -3925,6 +3925,17 @@ static int fg_psy_get_property(struct power_supply *psy,
+ 	switch (psp) {
+ 	case POWER_SUPPLY_PROP_CAPACITY:
+ 		rc = fg_get_prop_capacity(fg, &pval->intval);
++		/* lilac: spurious capacity 0 / failed read (flaky FG SRAM access) must not look like
++		 * an empty battery to mce/DSME; keep the last known value while the voltage is healthy. */
++		if (fg->last_soc > 0 && (rc < 0 || pval->intval == 0)) {
++			int vbatt_uv;
++
++			if (rc < 0 || (!fg_get_battery_voltage(fg, &vbatt_uv) &&
++				vbatt_uv > (chip->dt.cutoff_volt_mv + 250) * 1000)) {
++				pval->intval = fg->last_soc;
++				rc = 0;
++			}
++		}
+ 		break;
+ 	case POWER_SUPPLY_PROP_CAPACITY_RAW:
+ 		rc = fg_get_msoc_raw(fg, &pval->intval);

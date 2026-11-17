@@ -1,0 +1,30 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Chirayu Desai <chirayudesai1@gmail.com>
+Date: Fri, 27 Mar 2020 03:49:31 +0530
+Subject: [PATCH] releasetools: Use du -b
+
+* When $OUT is on a compressed disk,
+  `du -k -s` might not return the correct sizes.
+* Adding `-b` gets us close to the actual size.
+
+toybox commit: https://github.com/landley/toybox/pull/177
+
+Test: m, builds and boots.
+Devices: crosshatch blueline bonito sargo (anything with dynamic partitions)
+---
+ tools/releasetools/build_image.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/tools/releasetools/build_image.py b/tools/releasetools/build_image.py
+index 8cf074147e6f90a4601974b8dc36437a70cc762a..7567346493282ad35cf2e372c45ddbde0e3df181 100755
+--- a/tools/releasetools/build_image.py
++++ b/tools/releasetools/build_image.py
+@@ -57,7 +57,7 @@ def GetDiskUsage(path):
+   Returns:
+     The number of bytes based on a 1K block_size.
+   """
+-  cmd = ["du", "-k", "-s", path]
++  cmd = ["du", "-b", "-k", "-s", path]
+   output = common.RunAndCheckOutput(cmd, verbose=False)
+   return int(output.split()[0]) * 1024
+ 

@@ -1,0 +1,19 @@
+Notes on sparse/usr/libexec/droid-hybris-overrides (not packaged): files that droid-config-lilac's %triggerin copies over droid-hal-lilac's
+/usr/libexec/droid-hybris after droid-hal-lilac or droidmedia is installed.
+
+Origin: copied from the microSD development system in September 2026, when droid-hal-lilac was not yet
+rebuilt from the patched tree.
+
+State for release 1.4 (2026-11-15):
+- 379 files that droid-hal-lilac ships byte-identically were removed.
+- 41 files differ from droid-hal-lilac and stay: the bionic linkers (droid-hal-lilac has symlinks into
+  /apex), libc-adjacent libraries, libutils, libbinder_ndk, libEGL/libGLES, radio and HIDL libraries,
+  init.rc, init.zygote64_32.rc, the dev-alog libcutils variants. A test with droid-hal-lilac's versions
+  of 37 of them made the vendor composer (vendor.hwcomposer-2-3) abort on every start (no display), so at
+  least one of them is needed; most likely libutils or libbinder_ndk (the only ones with different
+  symbols or dependencies). The rest differ only in build ids.
+- 989 files are not in droid-hal-lilac at all, mostly APEX payloads (system/apex/*) that the droid-hal
+  packaging does not include.
+
+Planned for 1.5: ship the APEX payloads from droid-hal-lilac, find which of the 41 the composer needs and
+make that a source change, then drop this overlay.

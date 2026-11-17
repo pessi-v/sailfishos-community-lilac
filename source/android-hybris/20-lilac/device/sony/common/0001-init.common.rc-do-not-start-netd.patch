@@ -1,0 +1,27 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: pessi-v <pessimo@posteo.net>
+Date: Sun, 15 Nov 2026 17:54:20 +0000
+Subject: [PATCH] (hybris) init.common.rc: do not start netd
+
+An explicit "start netd" clears the service's "disabled" flag, so this
+early start in post-fs-data would bring netd up even though Sailfish OS
+does not use it (see the system/netd change). dummy_netd provides the
+netd binder service instead.
+---
+ rootdir/vendor/etc/init/hw/init.common.rc |    3 ---
+ 1 file changed, 3 deletions(-)
+
+diff --git a/rootdir/vendor/etc/init/hw/init.common.rc b/rootdir/vendor/etc/init/hw/init.common.rc
+index bab52ce42ecb10bb32f0f4e7590e6f65fb9c56b0..8d264a785167b68b5099cd7804d4da2829b1b823 100644
+--- a/rootdir/vendor/etc/init/hw/init.common.rc
++++ b/rootdir/vendor/etc/init/hw/init.common.rc
+@@ -134,9 +134,6 @@ on late-fs
+     mount_all /vendor/etc/fstab.${ro.hardware} --late
+ 
+ on post-fs-data
+-    # We can start netd here before in is launched in common init.rc on zygote-start
+-    start netd
+-
+     # Create directory used by bluetooth subsystem
+     mkdir /data/vendor/bluetooth 2770 bluetooth bluetooth
+ 

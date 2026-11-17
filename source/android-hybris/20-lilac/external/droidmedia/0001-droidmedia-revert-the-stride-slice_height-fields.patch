@@ -1,0 +1,44 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: pessi-v <pessimo@posteo.net>
+Date: Sun, 15 Nov 2026 16:34:02 +0000
+Subject: [PATCH] (lilac) droidmedia: revert the stride/slice_height output fields
+
+Sailfish OS 5.2's gst-droid (0.20260508.1) still uses the older
+DroidMediaCodecMetaData layout. With the two new fields, gst-droid and
+droidmedia disagree on the structure size, and video decoding produces
+garbage or crashes. Revert to the layout gst-droid was built against
+until gst-droid follows.
+---
+ droidmediacodec.cpp |    5 -----
+ droidmediacodec.h   |    2 --
+ 2 files changed, 7 deletions(-)
+
+diff --git a/droidmediacodec.cpp b/droidmediacodec.cpp
+index 9df6c020bae1d3405ac34727fa09336ad9894402..9d75d22fc6e6a305f399f4bb4085490f5be9fd5a 100644
+--- a/droidmediacodec.cpp
++++ b/droidmediacodec.cpp
+@@ -1162,11 +1162,6 @@ void droid_media_codec_get_output_info(DroidMediaCodec *codec,
+   md->findInt32(android::kKeySampleRate, &info->sample_rate);
+   md->findInt32(android::kKeyColorFormat, &info->hal_format);
+ 
+-  info->stride = -1;
+-  info->slice_height = -1;
+-  md->findInt32(android::kKeyStride, &info->stride);
+-  md->findInt32(android::kKeySliceHeight, &info->slice_height);
+-
+   if (!md->findRect(android::kKeyCropRect, &crop->left, &crop->top, &crop->right, &crop->bottom)) {
+     crop->left = crop->top = 0;
+     crop->right = info->width;
+diff --git a/droidmediacodec.h b/droidmediacodec.h
+index e9bb10ce6e0732f0f99bc27f9a5fff4b6367bc77..908da779fc0b1067b51a19c4093a25e0eb2b719a 100644
+--- a/droidmediacodec.h
++++ b/droidmediacodec.h
+@@ -59,8 +59,6 @@ typedef struct {
+   int32_t sample_rate;
+   int32_t hal_format;
+   DroidMediaCodecFlags flags;
+-  int32_t stride;
+-  int32_t slice_height;
+ } DroidMediaCodecMetaData;
+ 
+ typedef struct {

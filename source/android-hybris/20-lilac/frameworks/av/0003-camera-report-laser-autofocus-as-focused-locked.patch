@@ -1,0 +1,49 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: pessi-v <pessimo@posteo.net>
+Date: Sun, 15 Nov 2026 16:31:43 +0000
+Subject: [PATCH] (lilac) camera: report laser autofocus as focused-locked
+
+With the laser rangefinder in range, the yoshino HAL sets the AF mode to
+OFF and drives the lens from the ToF distance, so every result carries
+AF_MODE_OFF / AF_STATE_INACTIVE. The vendor workaround (a fake AF state
+in the partial results) does not reach Android 11's FrameProcessor,
+which keeps the final value, so autoFocus() never completes and the
+camera app's shutter waits forever.
+
+In process3aState(), when the result says AF_MODE_OFF but the API1
+client asked for an autofocus mode, report FOCUSED_LOCKED: the lens is
+already positioned by the laser. A new trigger id is still required, so
+idle frames do nothing.
+---
+ .../libcameraservice/api1/client2/FrameProcessor.cpp   | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
+
+diff --git a/services/camera/libcameraservice/api1/client2/FrameProcessor.cpp b/services/camera/libcameraservice/api1/client2/FrameProcessor.cpp
+index 2daacd16af1335bfdc8662755dc621c67bd1b572..745be3f9185b8c420cee24de0864f147f0b35b63 100644
+--- a/services/camera/libcameraservice/api1/client2/FrameProcessor.cpp
++++ b/services/camera/libcameraservice/api1/client2/FrameProcessor.cpp
+@@ -287,6 +287,24 @@ status_t FrameProcessor::process3aState(const CaptureResult &frame,
+             &pendingState.awbState, frameNumber, cameraId);
+ 
+     pendingState.afTriggerId = frame.mResultExtras.afTriggerId;
++
++    // lilac: laser (ToF) focus. The HAL drives the lens from the laser distance, reports
++    // AF_MODE_OFF and an INACTIVE AF_STATE forever, so an API1 autoFocus() trigger would never
++    // complete. If the client asked for an autofocus mode, report the lens as locked.
++    if (gotAFState && pendingState.afMode == ANDROID_CONTROL_AF_MODE_OFF &&
++            pendingState.afState != ANDROID_CONTROL_AF_STATE_FOCUSED_LOCKED) {
++        Parameters::focusMode_t clientFocusMode;
++        {
++            SharedParameters::Lock l(client->getParameters());
++            clientFocusMode = l.mParameters.focusMode;
++        }
++        if (clientFocusMode == Parameters::FOCUS_MODE_AUTO ||
++                clientFocusMode == Parameters::FOCUS_MODE_MACRO ||
++                clientFocusMode == Parameters::FOCUS_MODE_CONTINUOUS_PICTURE ||
++                clientFocusMode == Parameters::FOCUS_MODE_CONTINUOUS_VIDEO) {
++            pendingState.afState = ANDROID_CONTROL_AF_STATE_FOCUSED_LOCKED;
++        }
++    }
+     pendingState.aeTriggerId = frame.mResultExtras.precaptureTriggerId;
+ 
+     if (gotAEState && (frameNumber > mLastAEFrameNumber)) {

@@ -1,0 +1,29 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: pessi-v <pessimo@posteo.net>
+Date: Sun, 15 Nov 2026 16:30:30 +0000
+Subject: [PATCH] (hybris) scudo: follow the hybris TLS slot layout
+
+The hybris bionic TLS patches move TLS_SLOT_SANITIZER from slot 6 to
+slot 7. Scudo's standalone allocator keeps its own copy of that constant
+instead of including bionic's tls_defines.h, so it has to follow by hand.
+With the stock value every process using Scudo writes over the stack
+guard slot and crashes (SIGBUS) at start.
+---
+ standalone/linux.h |    4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/standalone/linux.h b/standalone/linux.h
+index c8e41484c85152fce1e516bdd0b969ee57eaf197..d81410be46c521c1d4bc40d8d39c39ee7b9db808 100644
+--- a/standalone/linux.h
++++ b/standalone/linux.h
+@@ -55,7 +55,9 @@ struct MapPlatformData {};
+ // The Android Bionic team has allocated a TLS slot for sanitizers starting
+ // with Q, given that Android currently doesn't support ELF TLS. It is used to
+ // store sanitizer thread specific data.
+-static const int TLS_SLOT_SANITIZER = 6;
++static const int TLS_SLOT_SANITIZER = 7;  // lilac: hybris-patches shifts bionic's own TLS_SLOT_SANITIZER from 6 to 7 to free slot 6 for
++  // TLS_SLOT_STACK_GUARD -- this copy, independent of bionic/libc/platform/bionic/
++  // tls_defines.h by Scudo's own "standalone" design, must track that shift by hand.
+ 
+ ALWAYS_INLINE uptr *getAndroidTlsPtr() {
+   return reinterpret_cast<uptr *>(&__get_tls()[TLS_SLOT_SANITIZER]);

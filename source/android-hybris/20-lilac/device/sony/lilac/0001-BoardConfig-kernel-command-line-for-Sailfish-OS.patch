@@ -1,0 +1,31 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: pessi-v <pessimo@posteo.net>
+Date: Sun, 15 Nov 2026 16:31:43 +0000
+Subject: [PATCH] (lilac) BoardConfig: kernel command line for the Sailfish OS boot image
+
+androidboot.mode=normal keeps the bootloader's charger mode from taking
+over a normal boot (it offlines seven of the eight cores),
+androidboot.configfs and androidboot.usbcontroller let init set up the
+USB gadget, and jolla.test_mode/data_subdir are read by the hybris-boot
+init script.
+---
+ BoardConfig.mk |    9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/BoardConfig.mk b/BoardConfig.mk
+index 022dfcb201b54043844ee5bd833aa482da39533d..0b4fd05e130422738a0f20a6bfdd64d4f037ce44 100644
+--- a/BoardConfig.mk
++++ b/BoardConfig.mk
+@@ -48,3 +48,12 @@ BOARD_VENDORIMAGE_EXTFS_INODE_COUNT := 4096
+ BOARD_PROPERTY_OVERRIDES_SPLIT_ENABLED := true
+ 
+ #TARGET_TAP_TO_WAKE_NODE := "/sys/devices/virtual/input/clearpad/wakeup_gesture"
++
++# Sailfish OS boot: androidboot.configfs/usbcontroller let init set up the USB
++# gadget; androidboot.mode=normal keeps the bootloader's charger mode (which
++# offlines 7 of 8 cores) from taking over a normal boot.
++BOARD_KERNEL_CMDLINE += androidboot.mode=normal
++BOARD_KERNEL_CMDLINE += androidboot.configfs=true
++BOARD_KERNEL_CMDLINE += androidboot.usbcontroller=a800000.dwc3
++BOARD_KERNEL_CMDLINE += data_subdir=sfos-v2
++BOARD_KERNEL_CMDLINE += jolla.test_mode=USER

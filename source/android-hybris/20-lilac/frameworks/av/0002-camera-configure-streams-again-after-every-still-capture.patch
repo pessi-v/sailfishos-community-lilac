@@ -1,0 +1,94 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: pessi-v <pessimo@posteo.net>
+Date: Sun, 15 Nov 2026 16:31:42 +0000
+Subject: [PATCH] (lilac) camera: configure streams again after every still capture
+
+The yoshino camera HAL (QCamera3HWI) completes exactly one JPEG capture
+per stream configuration. On the second capture without a new
+configure_streams() it logs "could not find the input buf index", the
+JPEG job slot never frees, and every later capture hangs.
+
+CaptureSequencer::manageDone() leaves the device configured for a fast
+next capture, and Camera3Device skips configure_streams() while the
+stream set is unchanged. Add CameraDeviceBase::forceNextConfigureStreams()
+(sets mNeedConfig) and call it when a still capture is done, so the HAL
+gets a fresh configuration before the next one.
+---
+ .../api1/client2/CaptureSequencer.cpp              |    2 ++
+ .../libcameraservice/common/CameraDeviceBase.h     |    6 ++++++
+ .../libcameraservice/device3/Camera3Device.cpp     |   17 +++++++++++++++++
+ .../libcameraservice/device3/Camera3Device.h       |    3 +++
+ 4 files changed, 28 insertions(+)
+
+diff --git a/services/camera/libcameraservice/api1/client2/CaptureSequencer.cpp b/services/camera/libcameraservice/api1/client2/CaptureSequencer.cpp
+index 0c01a913a0fe9f34cbc38477ed3afa97be721068..19efad5d2e9bde6a2f9205a8733c20f637dff4bd 100644
+--- a/services/camera/libcameraservice/api1/client2/CaptureSequencer.cpp
++++ b/services/camera/libcameraservice/api1/client2/CaptureSequencer.cpp
+@@ -304,6 +304,8 @@ CaptureSequencer::CaptureState CaptureSequencer::manageDone(sp<Camera2Client> &c
+                             "%s (%d)", __FUNCTION__, client->getCameraId(),
+                             strerror(-res), res);
+                 }
++                // lilac: force a fresh HAL configure_streams() after every still capture
++                client->getCameraDevice()->forceNextConfigureStreams();
+                 l.mParameters.state = Parameters::STOPPED;
+                 break;
+             case Parameters::VIDEO_SNAPSHOT:
+diff --git a/services/camera/libcameraservice/common/CameraDeviceBase.h b/services/camera/libcameraservice/common/CameraDeviceBase.h
+index a537ef591a59da83e00cac67052b824be54e6b9e..c04a7df0136379fc1103957ff08832386fe8f621 100644
+--- a/services/camera/libcameraservice/common/CameraDeviceBase.h
++++ b/services/camera/libcameraservice/common/CameraDeviceBase.h
+@@ -251,6 +251,12 @@ class CameraDeviceBase : public virtual FrameProducer {
+      */
+     virtual status_t waitUntilDrained() = 0;
+ 
++    /* lilac: force a fresh HAL configure_streams() after every still capture --
++     * see Camera3Device's own implementation for the full story. Callable any
++     * time; takes effect on the next stream (re)configuration.
++     */
++    virtual void forceNextConfigureStreams() = 0;
++
+     /**
+      * Get Jpeg buffer size for a given jpeg resolution.
+      * Negative values are error codes.
+diff --git a/services/camera/libcameraservice/device3/Camera3Device.cpp b/services/camera/libcameraservice/device3/Camera3Device.cpp
+index d5f136b84d4818c661a102aeed7ab5cd8e982988..7171321a338ca74a48c43772db3ee18f0f317cc8 100644
+--- a/services/camera/libcameraservice/device3/Camera3Device.cpp
++++ b/services/camera/libcameraservice/device3/Camera3Device.cpp
+@@ -1748,6 +1748,23 @@ status_t Camera3Device::waitUntilDrained() {
+     return waitUntilDrainedLocked(maxExpectedDuration);
+ }
+ 
++/* lilac: force a fresh HAL configure_streams() after every still capture --
++ * configureStreamsLocked() below deliberately skips the real HAL
++ * configure_streams() call whenever the requested stream set hasn't changed
++ * since the last configuration (`if (!mNeedConfig) { ... return OK; }`) -- a
++ * real AOSP performance optimization, but one that also means this device's
++ * own vendor camera HAL blob never gets a chance to reset whatever internal
++ * state is breaking its own JPEG-completion bookkeeping after the first
++ * still capture in a session. Call this once a still capture is done (see
++ * CaptureSequencer::manageDone()) to force the *next* stream configuration
++ * to be a real one again, matching the one flow already confirmed to work
++ * every time (a full camera close/reopen, which always configures fresh).
++ */
++void Camera3Device::forceNextConfigureStreams() {
++    Mutex::Autolock l(mLock);
++    mNeedConfig = true;
++}
++
+ status_t Camera3Device::waitUntilDrainedLocked(nsecs_t maxExpectedDuration) {
+     switch (mStatus) {
+         case STATUS_UNINITIALIZED:
+diff --git a/services/camera/libcameraservice/device3/Camera3Device.h b/services/camera/libcameraservice/device3/Camera3Device.h
+index e10da2c41b8f8a968c2bceba8f197f74a23b0592..787b4c79995dac25836c08c809b7f3c7ddb6a61f 100644
+--- a/services/camera/libcameraservice/device3/Camera3Device.h
++++ b/services/camera/libcameraservice/device3/Camera3Device.h
+@@ -158,6 +158,9 @@ class Camera3Device :
+     // Transitions to the idle state on success
+     status_t waitUntilDrained() override;
+ 
++    // lilac: force a fresh HAL configure_streams() after every still capture
++    void forceNextConfigureStreams() override;
++
+     status_t setNotifyCallback(wp<NotificationListener> listener) override;
+     bool     willNotify3A() override;
+     status_t waitForNextFrame(nsecs_t timeout) override;

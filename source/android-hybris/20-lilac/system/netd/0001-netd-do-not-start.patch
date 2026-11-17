@@ -1,0 +1,25 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: pessi-v <pessimo@posteo.net>
+Date: Sun, 15 Nov 2026 17:54:20 +0000
+Subject: [PATCH] (hybris) netd: do not start
+
+Sailfish OS does not run Android's netd: ConnMan manages interfaces,
+routing and the firewall. netd rewrites the policy routing rules (ending
+in "from all unreachable") and the INPUT chain, which cuts off ConnMan's
+rules. The binder service Android components look for is provided by
+dummy_netd instead.
+---
+ server/netd.rc |    1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/server/netd.rc b/server/netd.rc
+index e6316c123662179200588fda81e57c2d1c95fe75..0c14bee3f66be410074e8a4ff7ff3b8cffa8c2af 100644
+--- a/server/netd.rc
++++ b/server/netd.rc
+@@ -1,5 +1,6 @@
+ service netd /system/bin/netd
+     class main
++    disabled
+     capabilities CHOWN DAC_OVERRIDE DAC_READ_SEARCH FOWNER IPC_LOCK KILL NET_ADMIN NET_BIND_SERVICE NET_RAW SETUID SETGID
+     socket dnsproxyd stream 0660 root inet
+     socket mdns stream 0660 root system

@@ -1,0 +1,33 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: pessi-v <pessimo@posteo.net>
+Date: Sun, 15 Nov 2026 16:31:43 +0000
+Subject: [PATCH] (lilac) timekeep: add the sysprop API files
+
+The build checks SonyTimekeepProperties against api/*-current.txt and
+*-latest.txt, which are missing from the repository. The files are the
+dump produced by building the module (m SonyTimekeepProperties-dump-api).
+---
+ sysprop/api/SonyTimekeepProperties-current.txt | 11 +++++++++++
+ sysprop/api/SonyTimekeepProperties-latest.txt  |  0
+ 2 files changed, 11 insertions(+)
+
+diff --git a/sysprop/api/SonyTimekeepProperties-current.txt b/sysprop/api/SonyTimekeepProperties-current.txt
+new file mode 100644
+index 0000000000000000000000000000000000000000..e85dbb1c7d409cd7752621384ec089e3b05178ec
+--- /dev/null
++++ b/sysprop/api/SonyTimekeepProperties-current.txt
+@@ -0,0 +1,11 @@
++props {
++  owner: Vendor
++  module: "com.sony.timekeep.SonyTimekeepProperties"
++  prop {
++    api_name: "timeadjust"
++    type: String
++    access: ReadWrite
++    scope: Internal
++    prop_name: "persist.vendor.timeadjust"
++  }
++}
+diff --git a/sysprop/api/SonyTimekeepProperties-latest.txt b/sysprop/api/SonyTimekeepProperties-latest.txt
+new file mode 100644
+index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391

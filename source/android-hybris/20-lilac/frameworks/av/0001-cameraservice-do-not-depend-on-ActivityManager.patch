@@ -1,0 +1,82 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: pessi-v <pessimo@posteo.net>
+Date: Sun, 15 Nov 2026 16:31:42 +0000
+Subject: [PATCH] (hybris) cameraservice: do not depend on ActivityManager or device users
+
+Sailfish OS does not run system_server, so ActivityManager and the
+Android multi-user state never exist.
+
+UidPolicy::registerSelf() could still find a stale "activity" entry in
+servicemanager, mark itself registered, and then deny every client
+because no UID is ever reported active. Make registerSelf() a no-op, so
+the existing "activity manager unreachable, assume active" path applies.
+
+validateClientPermissionsLocked() only allows the foreground Android
+user, which nothing ever sets, so every client was rejected with
+"cannot connect from device user". Skip that check.
+---
+ services/camera/libcameraservice/CameraService.cpp |   44 +++++++++-----------
+ 1 file changed, 20 insertions(+), 24 deletions(-)
+
+diff --git a/services/camera/libcameraservice/CameraService.cpp b/services/camera/libcameraservice/CameraService.cpp
+index 6bacf6e2af14c34da44fffd60d433d7a5cdf40e2..8fb31388cfc1c6ba12378450fc99c1d938bc6fbd 100644
+--- a/services/camera/libcameraservice/CameraService.cpp
++++ b/services/camera/libcameraservice/CameraService.cpp
+@@ -1204,17 +1204,15 @@ Status CameraService::validateClientPermissionsLocked(const String8& cameraId,
+ 
+     userid_t clientUserId = multiuser_get_user_id(clientUid);
+ 
+-    // Only allow clients who are being used by the current foreground device user, unless calling
+-    // from our own process OR the caller is using the cameraserver's HIDL interface.
+-    if (getCurrentServingCall() != BinderCallType::HWBINDER && callingPid != getpid() &&
+-            (mAllowedUsers.find(clientUserId) == mAllowedUsers.end())) {
+-        ALOGE("CameraService::connect X (PID %d) rejected (cannot connect from "
+-                "device user %d, currently allowed device users: %s)", callingPid, clientUserId,
+-                toString(mAllowedUsers).string());
+-        return STATUS_ERROR_FMT(ERROR_PERMISSION_DENIED,
+-                "Callers from device user %d are not currently allowed to connect to camera \"%s\"",
+-                clientUserId, cameraId.string());
+-    }
++    // lilac: never enforce the foreground-device-user restriction
++    // -- mAllowedUsers is only ever populated by
++    // doUserSwitch(), itself only called from a real ActivityManager user-switch
++    // broadcast this port's system_server-less design never sends (see bug 1's
++    // own comment above). Android's own multiuser math also means this port's
++    // convention of running every Sailfish app as UID 100000 lands on "device
++    // user 1", not user 0, so even a single-user device would trip this. This
++    // port has no concept of Android multi-user switching at all.
++    (void)clientUserId;
+ 
+     return Status::ok();
+ }
+@@ -3111,19 +3109,17 @@ void CameraService::Client::OpsCallback::opChanged(int32_t op,
+ // ----------------------------------------------------------------------------
+ 
+ void CameraService::UidPolicy::registerSelf() {
+-    Mutex::Autolock _l(mUidLock);
+-
+-    if (mRegistered) return;
+-    status_t res = mAm.linkToDeath(this);
+-    mAm.registerUidObserver(this, ActivityManager::UID_OBSERVER_GONE
+-            | ActivityManager::UID_OBSERVER_IDLE
+-            | ActivityManager::UID_OBSERVER_ACTIVE | ActivityManager::UID_OBSERVER_PROCSTATE,
+-            ActivityManager::PROCESS_STATE_UNKNOWN,
+-            String16("cameraserver"));
+-    if (res == OK) {
+-        mRegistered = true;
+-        ALOGV("UidPolicy: Registered with ActivityManager");
+-    }
++    /* lilac: never link to ActivityManager --
++     * this port never runs system_server, so
++     * ActivityManager is never legitimately reachable, and mRegistered must
++     * stay false so isUidActiveLocked()'s own "activity manager is
++     * unreachable, assume everything is active" bypass takes over. A stale,
++     * unexplained "activity" service registration (empty interface
++     * descriptor in `service list`, dumpsys hangs) was otherwise making
++     * linkToDeath() return OK anyway, permanently denying every camera open
++     * with "can't use the camera from an idle UID".
++     */
++    return;
+ }
+ 
+ void CameraService::UidPolicy::unregisterSelf() {

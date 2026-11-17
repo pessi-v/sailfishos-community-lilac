@@ -1,0 +1,25 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: LuK1337 <priv.luk@gmail.com>
+Date: Tue, 29 Sep 2020 20:36:50 +0200
+Subject: [PATCH] Switch to exfatprogs compatible fsck parameter
+
+exfatprogs accepts 'p' for automatic repair.
+
+Change-Id: I2c436816a293a36fc9f0cd635cdb9ca3b5f88bfc
+---
+ fs/Exfat.cpp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/fs/Exfat.cpp b/fs/Exfat.cpp
+index 34f10240892fa2a4b69389dc66c9ec720d352e23..6793f00d1bea5283ed3e148ee6b8052aa118f88e 100644
+--- a/fs/Exfat.cpp
++++ b/fs/Exfat.cpp
+@@ -41,7 +41,7 @@ bool IsSupported() {
+ status_t Check(const std::string& source) {
+     std::vector<std::string> cmd;
+     cmd.push_back(kFsckPath);
+-    cmd.push_back("-a");
++    cmd.push_back("-p");
+     cmd.push_back(source);
+ 
+     int rc = ForkExecvp(cmd, nullptr, sFsckUntrustedContext);

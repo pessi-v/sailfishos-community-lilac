@@ -1,0 +1,50 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: pessi-v <pessimo@posteo.net>
+Date: Sun, 15 Nov 2026 16:28:30 +0000
+Subject: [PATCH] (hybris) init.rc: do not run apexd
+
+apexd is not run on this adaptation (see the previous patch).
+apexd-bootstrap and apexd both carry reboot_on_failure, so starting them
+reboots the device, and "wait_for_prop apexd.status activated" would stall
+post-fs-data forever because nothing sets the property.
+---
+ rootdir/init.rc |   12 +++++++++---
+ 1 file changed, 9 insertions(+), 3 deletions(-)
+
+diff --git a/rootdir/init.rc b/rootdir/init.rc
+index ef388a63ddf6f46c0704257f27cdd7e0759f937c..62cef8ab48d982ea850988167b59d3b0df1fcdbd 100644
+--- a/rootdir/init.rc
++++ b/rootdir/init.rc
+@@ -68,7 +68,9 @@ on early-init
+     # Run apexd-bootstrap so that APEXes that provide critical libraries
+     # become available. Note that this is executed as exec_start to ensure that
+     # the libraries are available to the processes started after this statement.
+-    exec_start apexd-bootstrap
++    # lilac: apexd is never run on this Sailfish-hosted setup.
++    # apexd-bootstrap carries its own reboot_on_failure and always fails here.
++    # was: exec_start apexd-bootstrap
+ 
+     # Generate linker config based on apex mounted in bootstrap namespace
+     update_linker_config
+@@ -560,7 +562,9 @@ on post-fs-data
+     mkdir /data/apex/hashtree 0700 root system
+     mkdir /data/apex/sessions 0700 root system
+     mkdir /data/app-staging 0750 system system encryption=None
+-    start apexd
++    # lilac: apexd is never run on this Sailfish-hosted setup.
++    # the plain apexd service also carries reboot_on_failure.
++    # was: start apexd
+ 
+     # Avoid predictable entropy pool. Carry over entropy from previous boot.
+     copy /data/system/entropy.dat /dev/urandom
+@@ -753,7 +757,9 @@ on post-fs-data
+     mkdir /data/misc/train-info/ 0770 statsd system
+ 
+     # Wait for apexd to finish activating APEXes before starting more processes.
+-    wait_for_prop apexd.status activated
++    # lilac: apexd is never run on this Sailfish-hosted setup.
++    # apexd.status is never set now, so this would stall boot forever otherwise.
++    # was: wait_for_prop apexd.status activated
+     perform_apex_config
+ 
+     # Special-case /data/media/obb per b/64566063

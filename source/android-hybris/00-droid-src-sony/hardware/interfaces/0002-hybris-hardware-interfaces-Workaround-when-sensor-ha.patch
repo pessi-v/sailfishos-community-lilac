@@ -1,0 +1,22 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Matti=20Lehtim=C3=A4ki?= <matti.lehtimaki@jolla.com>
+Date: Tue, 1 Mar 2022 22:08:26 +0200
+Subject: [PATCH] (hybris) hardware: interfaces: Workaround when sensor hal
+ starts too early
+
+[hybris] hardware: interfaces: Workaround when sensor hal starts too early. JB#56568
+---
+ .../multihal/android.hardware.sensors@2.1-service-multihal.rc  | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/sensors/2.1/multihal/android.hardware.sensors@2.1-service-multihal.rc b/sensors/2.1/multihal/android.hardware.sensors@2.1-service-multihal.rc
+index f47e060f88b9e2f82d69d0f8828270760c1a6c06..b474154ccb05f89d133294b420b4fb928a7e94df 100644
+--- a/sensors/2.1/multihal/android.hardware.sensors@2.1-service-multihal.rc
++++ b/sensors/2.1/multihal/android.hardware.sensors@2.1-service-multihal.rc
+@@ -1,4 +1,5 @@
+-service vendor.sensors-hal-2-1-multihal /vendor/bin/hw/android.hardware.sensors@2.1-service.multihal
++# Workaround when sometimes sensor hal starts too early
++service vendor.sensors-hal-2-1-multihal /system/bin/sh -c "sleep 3; /vendor/bin/hw/android.hardware.sensors@2.1-service.multihal"
+     class hal
+     user system
+     group system wakelock context_hub

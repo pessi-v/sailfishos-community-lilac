@@ -1,0 +1,38 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Pablo Mendez Hernandez <pablomh@gmail.com>
+Date: Thu, 17 Dec 2020 10:13:41 +0100
+Subject: [PATCH] wifi_hal: Fix access check of control param file
+
+Currently, the driver control param file is created write-only,
+so fix the check:
+
+https://android.googlesource.com/kernel/msm-modules/qcacld/+/refs/heads/android-msm-coral-4.14-android11-qpr1/core/hdd/src/wlan_hdd_main.c#190
+
+More importantly the open below uses O_WRONLY as only a write is
+necessary, there is no need to check for read access.
+Otherwise, WiFi fails to be enabled:
+
+WifiHAL : Failed to access driver state control param Permission denied, 13 at /sys/kernel/boot_wlan/boot_wlan
+
+Fixes: 8996467be9 ("wifihal: Update driver control param to check driver is ready")
+Test: Manual build and functionality test
+Signed-off-by: Pablo Mendez Hernandez <pablomh@gmail.com>
+Signed-off-by: Marijn Suijten <marijn.suijten@somainline.org>
+Change-Id: If6308cd790c69d2d57815ef6815c779258005eff
+---
+ qcwcn/wifi_hal/wifi_hal.cpp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/qcwcn/wifi_hal/wifi_hal.cpp b/qcwcn/wifi_hal/wifi_hal.cpp
+index 6ab0e64c73787de35bbdc25f43e9fd04e3c9bb4f..d64e3b8a0419fb4d5feebe7ded675b28274a04c2 100644
+--- a/qcwcn/wifi_hal/wifi_hal.cpp
++++ b/qcwcn/wifi_hal/wifi_hal.cpp
+@@ -927,7 +927,7 @@ static int wifi_update_driver_state(const char *state) {
+     ts.tv_nsec = 200 * 1000000L;
+ 
+     do {
+-        if (access(WIFI_DRIVER_STATE_CTRL_PARAM, R_OK|W_OK) == 0)
++        if (access(WIFI_DRIVER_STATE_CTRL_PARAM, W_OK) == 0)
+             break;
+         nanosleep(&ts, (struct timespec *)NULL);
+     } while (--count > 0); /* wait at most 1 second for completion. */

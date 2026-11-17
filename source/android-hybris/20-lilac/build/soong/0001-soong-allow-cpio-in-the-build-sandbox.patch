@@ -1,0 +1,23 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: pessi-v <pessimo@posteo.net>
+Date: Sun, 15 Nov 2026 16:30:29 +0000
+Subject: [PATCH] (hybris) soong: allow cpio in the build sandbox
+
+The hybris-boot image is packed with cpio, which the soong path
+sandbox does not allow by default.
+---
+ ui/build/paths/config.go | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/ui/build/paths/config.go b/ui/build/paths/config.go
+index 57174013319b9e341759cc7468825be6065610c8..a25f8cde7fc66271b94aa1938b14c87355eda4c3 100644
+--- a/ui/build/paths/config.go
++++ b/ui/build/paths/config.go
+@@ -75,6 +75,7 @@ func GetConfig(name string) PathConfig {
+ 
+ var Configuration = map[string]PathConfig{
+ 	"bash":    Allowed,
++	"cpio":    Allowed,
+ 	"dd":      Allowed,
+ 	"diff":    Allowed,
+ 	"dlv":     Allowed,

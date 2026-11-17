@@ -1,0 +1,23 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: pessi-v <pessimo@posteo.net>
+Date: Sun, 15 Nov 2026 17:54:22 +0000
+Subject: [PATCH] (lilac) defconfig: enable the run-queue statistics
+
+The vendor interrupt balancer msm_irqbalance reads
+/sys/devices/system/cpu/cpu0/rq-stats. Without CONFIG_QCOM_RUN_QUEUE_STATS
+it exits immediately and init restarts it every 5 s; with it, it stays
+running and spreads the interrupts across the CPUs.
+---
+ arch/arm64/configs/aosp_yoshino_lilac_defconfig |    2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm64/configs/aosp_yoshino_lilac_defconfig b/arch/arm64/configs/aosp_yoshino_lilac_defconfig
+index a6181e0c93704b3130588bc43773ffc0ba4e8ee3..afeaee1f5b1131094d924a9fd64528f8da1b62ea 100644
+--- a/arch/arm64/configs/aosp_yoshino_lilac_defconfig
++++ b/arch/arm64/configs/aosp_yoshino_lilac_defconfig
+@@ -931,3 +931,5 @@ CONFIG_BT_BNEP=y
+ CONFIG_BT_BNEP_MC_FILTER=y
+ CONFIG_BT_BNEP_PROTO_FILTER=y
+ CONFIG_BT_HIDP=y
++# msm_irqbalance reads the run-queue statistics; without them it exits at start
++CONFIG_QCOM_RUN_QUEUE_STATS=y

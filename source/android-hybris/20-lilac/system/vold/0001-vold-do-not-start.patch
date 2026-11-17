@@ -1,0 +1,25 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: pessi-v <pessimo@posteo.net>
+Date: Sun, 15 Nov 2026 17:54:20 +0000
+Subject: [PATCH] (hybris) vold: do not start
+
+Sailfish OS mounts storage itself (udisks2 for removable media), and
+nothing on this adaptation uses Android's volume manager. vold only
+unmounts what it finds under /mnt at start and fails; on some builds its
+service carries reboot_on_failure.
+---
+ vold.rc |    1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/vold.rc b/vold.rc
+index 93d878663bdd6cd51cbd951e9a54cac3c75f8e72..9a04576a122c01b1d60c517a49f5bd0eb217c43b 100644
+--- a/vold.rc
++++ b/vold.rc
+@@ -2,6 +2,7 @@ service vold /system/bin/vold \
+         --blkid_context=u:r:blkid:s0 --blkid_untrusted_context=u:r:blkid_untrusted:s0 \
+         --fsck_context=u:r:fsck:s0 --fsck_untrusted_context=u:r:fsck_untrusted:s0
+     class core
++    disabled
+     ioprio be 2
+     writepid /dev/cpuset/foreground/tasks
+     shutdown critical

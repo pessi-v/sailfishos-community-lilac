@@ -1,0 +1,34 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: pessi-v <pessimo@posteo.net>
+Date: Sun, 15 Nov 2026 16:28:29 +0000
+Subject: [PATCH] (hybris) init: do not mount a tmpfs over /apex
+
+apexd is not run on this adaptation. The APEX payloads that are needed
+(runtime linker and libraries) are provided in /apex by the Sailfish OS
+side before droid-hal-init starts. The stock tmpfs mount would hide them
+behind an empty directory that nothing fills.
+---
+ init/init.cpp |   10 +++++++---
+ 1 file changed, 7 insertions(+), 3 deletions(-)
+
+diff --git a/init/init.cpp b/init/init.cpp
+index 2b32a4db33f93a835b123abf287a32a062119670..6b351aee25bda61f53db8229bc6475b5a0499b7f 100644
+--- a/init/init.cpp
++++ b/init/init.cpp
+@@ -649,9 +649,13 @@ static void MountExtraFilesystems() {
+ #define CHECKCALL(x) \
+     if ((x) != 0) PLOG(FATAL) << #x " failed.";
+ 
+-    // /apex is used to mount APEXes
+-    CHECKCALL(mount("tmpfs", "/apex", "tmpfs", MS_NOEXEC | MS_NOSUID | MS_NODEV,
+-                    "mode=0755,uid=0,gid=0"));
++    // lilac: apex is never activated on this Sailfish-hosted setup. Leaving /apex
++    // as-is (a plain persistent directory on this rootfs, pre-populated with real
++    // linker binaries -- see /apex/com.android.runtime/bin) instead of shadowing it
++    // with a fresh noexec tmpfs apexd would otherwise populate but never runs here.
++    // was:
++    // CHECKCALL(mount("tmpfs", "/apex", "tmpfs", MS_NOEXEC | MS_NOSUID | MS_NODEV,
++    //                 "mode=0755,uid=0,gid=0"));
+ 
+     // /linkerconfig is used to keep generated linker configuration
+     CHECKCALL(mount("tmpfs", "/linkerconfig", "tmpfs", MS_NOEXEC | MS_NOSUID | MS_NODEV,

@@ -1,0 +1,69 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: pessi-v <pessimo@posteo.net>
+Date: Sun, 15 Nov 2026 16:38:21 +0000
+Subject: [PATCH] (lilac) pil-msa: deassert the MSS reset before enabling its clocks
+
+pil_mss_reset() in this tree enables the MSS clocks first and releases
+the reset afterwards; the MBA load then fails and the modem never
+starts. Restore the order of the 4.4 kernel this SoC was released with:
+power up, deassert the reset, then enable the clocks.
+---
+ drivers/soc/qcom/pil-msa.c |   27 +++++++++++++++++++--------
+ 1 file changed, 19 insertions(+), 8 deletions(-)
+
+diff --git a/drivers/soc/qcom/pil-msa.c b/drivers/soc/qcom/pil-msa.c
+index daecbc464108c7d7426d84226e30d5009044551b..e76b7d633f96ab645609d2876f83ab449c2de71c 100644
+--- a/drivers/soc/qcom/pil-msa.c
++++ b/drivers/soc/qcom/pil-msa.c
+@@ -567,6 +567,17 @@ static int pil_mss_reset(struct pil_desc *pil)
+ 	if (ret)
+ 		goto err_power;
+ 
++	/*
++	 * lilac: deassert the MSS reset BEFORE enabling clocks, matching the
++	 * working 4.4 kernel. The MSS<->NoC AXI bridge clocks (gcc_mss_snoc_axi_clk,
++	 * gcc_mss_mnoc_bimc_axi_clk) cannot complete their halt handshake while the
++	 * MSS is held in reset, so enabling them first leaves them stuck at 'off'
++	 * forever and fails the MBA load with -EBUSY.
++	 */
++	ret = pil_mss_restart_reg(drv, 0);
++	if (ret)
++		goto err_clks;
++
+ 	ret = pil_mss_enable_clks(drv);
+ 	if (ret)
+ 		goto err_clks;
+@@ -576,13 +587,12 @@ static int pil_mss_reset(struct pil_desc *pil)
+ 		debug_val = readl_relaxed(drv->reg_base + QDSP6SS_DBG_CFG);
+ 	}
+ 
+-	/* Assert reset to subsystem */
+-	pil_mss_assert_resets(drv);
+-	/* Wait 6 32kHz sleep cycles for reset */
+-	udelay(200);
+-	ret = pil_mss_deassert_resets(drv);
+-	if (ret)
+-		goto err_restart;
++	/*
++	 * lilac: 4.4 does no assert/deassert cycle here -- the reset was already
++	 * deasserted above, before the clocks. The 4.14 cycle exists for
++	 * PDC-sync/alt-reset capable SoCs; msm8998's DT declares neither, so it is
++	 * a no-op here apart from re-imposing the broken ordering.
++	 */
+ 
+ 	if (!pil->minidump_ss || !pil->modem_ssr) {
+ 		writel_relaxed(debug_val, drv->reg_base + QDSP6SS_DBG_CFG);
+@@ -635,11 +645,12 @@ static int pil_mss_reset(struct pil_desc *pil)
+ 
+ err_q6v5_reset:
+ 	modem_log_rmb_regs(drv->rmb_base);
+-err_restart:
+ 	pil_mss_disable_clks(drv);
+ 	if (drv->ahb_clk_vote)
+ 		clk_disable_unprepare(drv->ahb_clk);
+ err_clks:
++	/* lilac: re-assert the reset we deasserted above, as 4.4 does */
++	pil_mss_restart_reg(drv, 1);
+ 	pil_mss_power_down(drv);
+ err_power:
+ 	return ret;

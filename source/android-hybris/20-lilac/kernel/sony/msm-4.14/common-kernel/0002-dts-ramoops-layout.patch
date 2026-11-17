@@ -1,0 +1,42 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: pessi-v <pessimo@posteo.net>
+Date: Sun, 15 Nov 2026 16:37:39 +0000
+Subject: [PATCH] (lilac) dts: ramoops layout for reading panics after a reset
+
+The phone has no serial console. Give ramoops a console/pmsg/ftrace
+layout in the reserved ramoops region, so the console of a crashed
+kernel can be read from /sys/fs/pstore after the next boot.
+---
+ .../boot/dts/qcom/msm8998-yoshino-common.dtsi      |   15 ++++++++++-----
+ 1 file changed, 10 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/qcom/msm8998-yoshino-common.dtsi b/arch/arm64/boot/dts/qcom/msm8998-yoshino-common.dtsi
+index 09daa7b5814f29beec2f5a6c76989d15705e80d3..2e8c3e67564aeea2af0bc749475ec316ce6a578a 100644
+--- a/arch/arm64/boot/dts/qcom/msm8998-yoshino-common.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8998-yoshino-common.dtsi
+@@ -28,15 +28,20 @@
+ 	};
+ 
+ 	reserved-memory {
++		/* lilac: LineageOS-compatible ramoops geometry, so a failed boot's console
++		 * log can be read back from LineageOS at /sys/fs/pstore/ afterward.
++		 * This kernel's own sizes were record 0x10000 / console 0x60000 /
++		 * ftrace 0x10000 / pmsg 0x20000 / ecc 16.
++		 */
+ 		ramoops@ffc00000 {
+ 			compatible = "removed-dma-pool", "ramoops";
+ 			no-map;
+ 			reg = <0 0xffc00000 0 0x00100000>;
+-			record-size = <0x10000>;
+-			console-size = <0x60000>;
+-			ftrace-size = <0x10000>;
+-			pmsg-size = <0x20000>;
+-			ecc-size = <16>;
++			record-size = <0x1000>;
++			console-size = <0x40000>;
++			ftrace-size = <0x0>;
++			pmsg-size = <0x0>;
++			ecc-size = <0x0>;
+ 		};
+ 	};
+ 
